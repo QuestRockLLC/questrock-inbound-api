@@ -7,6 +7,7 @@ import {
 import { loadStatusDefinitions } from '../lib/status-definitions.js';
 import { evaluateCallWithAi } from '../lib/ai/evaluate-call.js';
 import { buildAdminOutcomeEmail } from '../lib/admin-email.js';
+import { fetchShapeLead, syncShapeLeadFromEvaluation } from '../lib/shape/client.js';
 import { assertAuthorized, normalizePayload, readJsonBody, sendJson } from '../lib/http.js';
 import { resolveLeadPhone } from '../lib/zoom-payload.js';
 
@@ -85,6 +86,8 @@ export default async function handler(req, res) {
     const statusDefinitions = await loadStatusDefinitions(supabase);
     const historyBefore = await getTranscriptHistory(supabase, lead.lead_id);
 
+    const shapeSnapshot = await fetchShapeLead(payload.shapeLeadId);
+
     const { transcript, created } = await appendTranscript(supabase, {
       leadId: lead.lead_id,
       callSource: 'Zoom Phone',
@@ -103,12 +106,15 @@ export default async function handler(req, res) {
 
     const evaluation = await evaluateCallWithAi({
       lead,
+      shapeLead: shapeSnapshot.lead,
       transcriptHistory: history,
       latestTranscriptText: payload.transcriptText,
       statusDefinitions,
     });
 
     const updatedLead = await updateLeadFromAi(supabase, lead.lead_id, evaluation);
+
+    const shapeSync = await syncShapeLeadFromEvaluation(payload.shapeLeadId, evaluation);
 
     await supabase
       .from('transcripts')
@@ -124,6 +130,7 @@ export default async function handler(req, res) {
       evaluation,
       transcript,
       loName: payload.loName,
+      shapeSync,
     });
 
     return sendJson(res, 200, {
@@ -136,6 +143,7 @@ export default async function handler(req, res) {
       status_rationale: evaluation.statusRationale,
       call_summary: evaluation.callSummary,
       fields_populated: evaluation.fieldsPopulated,
+      shape_sync: shapeSync,
       lead: {
         full_name: updatedLead.full_name,
         phone_number: updatedLead.phone_number,
