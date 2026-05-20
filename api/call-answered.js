@@ -1,0 +1,139 @@
+import { getSupabaseClient } from '../lib/supabase.js';
+import { upsertLeadFromShapeCall } from '../lib/leads.js';
+import { insertInitialCallTranscript } from '../lib/transcripts.js';
+import { assertAuthorized, normalizePayload, readJsonBody, sendJson } from '../lib/http.js';
+import { resolveLeadPhone } from '../lib/zoom-payload.js';
+
+function parseCallAnsweredPayload(body) {
+  const normalized = normalizePayload(body);
+
+  const missing = [];
+
+  if (!normalized.shapeLeadId) {
+    missing.push('shape_lead_id');
+  }
+
+  if (!normalized.callerName) {
+    missing.push('caller_name');
+  }
+
+  if (!normalized.callerPhone) {
+    missing.push('caller_phone');
+  }
+
+  if (!normalized.calleeName) {
+    missing.push('callee_name');
+  }
+
+  if (!normalized.calleePhone && !normalized.calleeName) {
+    missing.push('callee_phone');
+  }
+
+  if (!normalized.timestamp) {
+    missing.push('timestamp');
+  }
+
+  if (missing.length > 0) {
+    const error = new Error(`Missing required fields: ${[...new Set(missing)].join(', ')}`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const { direction, formattedPhone } = resolveLeadPhone(normalized);
+
+  if (!formattedPhone) {
+    const error = new Error('Lead phone number must contain at least 10 digits.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const parsedTimestamp = new Date(normalized.timestamp);
+
+  if (Number.isNaN(parsedTimestamp.getTime())) {
+    const error = new Error('timestamp must be a valid ISO date string.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const leadNameRaw =
+    normalized.fullName ??
+    (direction === 'inbound' ? normalized.callerName : normalized.calleeName);
+
+  const callId =
+    normalized.callId ??
+    (normalized.eventTs
+      ? `answered-${normalized.eventTs}-${formattedPhone.replace(/\D/g, '')}`
+      : `answered-${parsedTimestamp.getTime()}`);
+
+  return {
+    shapeLeadId: String(normalized.shapeLeadId).trim(),
+    callId: String(callId).trim(),
+    direction,
+    timestamp: parsedTimestamp.toISOString(),
+    fullName: String(leadNameRaw).trim(),
+    phoneNumber: formattedPhone,
+    email: normalized.email ?? null,
+    currentAddress: normalized.currentAddress ?? null,
+    city: normalized.city ?? null,
+    state: normalized.state ?? null,
+    zipCode: normalized.zipCode ?? null,
+    companyName: normalized.companyName ?? null,
+    loName: normalized.loName ?? null,
+  };
+}
+
+/**
+ * Shape-first call answered handler.
+ * Run AFTER Shape search/create + assign owner in Zapier.
+ */
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return sendJson(res, 405, { error: 'Method Not Allowed' });
+  }
+
+  try {
+    assertAuthorized(req);
+
+    const body = readJsonBody(req);
+    const callData = parseCallAnsweredPayload(body);
+    const supabase = getSupabaseClient();
+
+    const { lead, created } = await upsertLeadFromShapeCall(supabase, {
+      shapeLeadId: callData.shapeLeadId,
+      fullName: callData.fullName,
+      phoneNumber: callData.phoneNumber,
+      email: callData.email,
+      currentAddress: callData.currentAddress,
+      city: callData.city,
+      state: callData.state,
+      zipCode: callData.zipCode,
+      companyName: callData.companyName,
+    });
+
+    const { transcript, created: transcriptCreated } = await insertInitialCallTranscript(supabase, {
+      lead,
+      externalCallId: callData.callId,
+      timestamp: callData.timestamp,
+    });
+
+    return sendJson(res, 200, {
+      lead_id: lead.lead_id,
+      transcript_id: transcript.transcript_id,
+      shape_lead_id: callData.shapeLeadId,
+      lead_created: created,
+      transcript_created: transcriptCreated,
+      formatted_phone: callData.phoneNumber,
+      current_status_label: lead.current_status_label,
+      current_status_color: lead.current_status_color,
+    });
+  } catch (error) {
+    console.error('[call-answered] failed:', error);
+
+    const statusCode = error.statusCode ?? 500;
+    const message =
+      statusCode === 500 ? 'Internal Server Error' : error.message ?? 'Request failed';
+
+    return sendJson(res, statusCode, { error: message });
+  }
+}
