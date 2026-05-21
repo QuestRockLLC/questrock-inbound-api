@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "api/zoom-transcript.js": {
+      "maxDuration": 300
+    },
+    "api/call-answered.js": {
+      "maxDuration": 60
+    },
+    "api/lo-note.js": {
+      "maxDuration": 60
+    }
+  }
+}

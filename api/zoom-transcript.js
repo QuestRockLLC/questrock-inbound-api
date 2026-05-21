@@ -1,13 +1,11 @@
+import { waitUntil } from '@vercel/functions';
 import { getSupabaseClient } from '../lib/supabase.js';
-import { findLeadByShapeId, updateLeadFromAi } from '../lib/leads.js';
+import { findLeadByShapeId } from '../lib/leads.js';
+import { appendTranscript, getTranscriptHistory } from '../lib/transcripts.js';
 import {
-  appendTranscript,
-  getTranscriptHistory,
-} from '../lib/transcripts.js';
-import { loadStatusDefinitions } from '../lib/status-definitions.js';
-import { evaluateCallWithAi } from '../lib/ai/evaluate-call.js';
-import { buildAdminOutcomeEmail } from '../lib/admin-email.js';
-import { fetchShapeLead, syncShapeLeadFromEvaluation } from '../lib/shape/client.js';
+  processTranscriptPipeline,
+  runBackgroundTranscriptJob,
+} from '../lib/process-transcript-pipeline.js';
 import { assertAuthorized, normalizePayload, readJsonBody, sendJson } from '../lib/http.js';
 import { resolveLeadPhone } from '../lib/zoom-payload.js';
 
@@ -45,6 +43,8 @@ function parseTranscriptPayload(body) {
   const direction = String(normalized.direction ?? 'inbound').trim().toLowerCase();
   const { formattedPhone } = resolveLeadPhone(normalized);
 
+  const asyncMode = body.async !== false && body.async !== 'false';
+
   return {
     shapeLeadId: String(normalized.shapeLeadId).trim(),
     callId: String(normalized.callId).trim(),
@@ -53,12 +53,41 @@ function parseTranscriptPayload(body) {
     loName: normalized.loName ?? null,
     formattedPhone,
     fullName: normalized.fullName ?? null,
+    asyncMode,
   };
 }
 
 /**
+ * Saves transcript row quickly for async mode (deduped by external_call_id).
+ */
+async function ingestTranscriptOnly(payload) {
+  const supabase = getSupabaseClient();
+  const lead = await findLeadByShapeId(supabase, payload.shapeLeadId);
+
+  if (!lead) {
+    const error = new Error(
+      `No Supabase lead linked to shape_lead_id ${payload.shapeLeadId}. Run /api/call-answered first.`,
+    );
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const { transcript, created } = await appendTranscript(supabase, {
+    leadId: lead.lead_id,
+    callSource: 'Zoom Phone',
+    transcriptText: payload.transcriptText,
+    timestamp: payload.timestamp,
+    externalCallId: `${payload.callId}:transcript`,
+    aiStatusLabel: lead.current_status_label,
+    aiStatusColor: lead.current_status_color,
+  });
+
+  return { lead, transcript, created };
+}
+
+/**
  * Zoom transcript webhook handler.
- * Appends transcript, runs AI evaluation, updates lead, returns admin email payload.
+ * Default async=true returns in ~2s; AI + Shape + notify run in background (avoids Zapier 30s timeout).
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -71,88 +100,30 @@ export default async function handler(req, res) {
 
     const body = readJsonBody(req);
     const payload = parseTranscriptPayload(body);
-    const supabase = getSupabaseClient();
 
-    const lead = await findLeadByShapeId(supabase, payload.shapeLeadId);
+    if (payload.asyncMode) {
+      const { lead, transcript, created } = await ingestTranscriptOnly(payload);
 
-    if (!lead) {
-      const error = new Error(
-        `No Supabase lead linked to shape_lead_id ${payload.shapeLeadId}. Run /api/call-answered first.`,
+      waitUntil(
+        runBackgroundTranscriptJob(payload).catch((error) => {
+          console.error('[zoom-transcript] waitUntil failed:', error);
+        }),
       );
-      error.statusCode = 404;
-      throw error;
+
+      return sendJson(res, 202, {
+        accepted: true,
+        async: true,
+        message:
+          'Transcript queued for AI processing. Admin email fires via ZAPIER_ADMIN_NOTIFY_WEBHOOK_URL when complete.',
+        lead_id: lead.lead_id,
+        transcript_id: transcript.transcript_id,
+        shape_lead_id: payload.shapeLeadId,
+        transcript_created: created,
+      });
     }
 
-    const statusDefinitions = await loadStatusDefinitions(supabase);
-    const historyBefore = await getTranscriptHistory(supabase, lead.lead_id);
-
-    const shapeSnapshot = await fetchShapeLead(payload.shapeLeadId);
-
-    const { transcript, created } = await appendTranscript(supabase, {
-      leadId: lead.lead_id,
-      callSource: 'Zoom Phone',
-      transcriptText: payload.transcriptText,
-      timestamp: payload.timestamp,
-      externalCallId: `${payload.callId}:transcript`,
-      aiStatusLabel: lead.current_status_label,
-      aiStatusColor: lead.current_status_color,
-    });
-
-    const history = created
-      ? [...historyBefore, transcript]
-      : historyBefore.length
-        ? historyBefore
-        : [transcript];
-
-    const evaluation = await evaluateCallWithAi({
-      lead,
-      shapeLead: shapeSnapshot.lead,
-      transcriptHistory: history,
-      latestTranscriptText: payload.transcriptText,
-      statusDefinitions,
-    });
-
-    const updatedLead = await updateLeadFromAi(supabase, lead.lead_id, evaluation);
-
-    const shapeSync = await syncShapeLeadFromEvaluation(payload.shapeLeadId, evaluation);
-
-    await supabase
-      .from('transcripts')
-      .update({
-        ai_status_label: evaluation.status.status_label,
-        ai_status_color: evaluation.status.color,
-        fields_populated: evaluation.fieldsPopulated,
-      })
-      .eq('transcript_id', transcript.transcript_id);
-
-    const email = buildAdminOutcomeEmail({
-      lead: updatedLead,
-      evaluation,
-      transcript,
-      loName: payload.loName,
-      shapeSync,
-    });
-
-    return sendJson(res, 200, {
-      lead_id: updatedLead.lead_id,
-      transcript_id: transcript.transcript_id,
-      shape_lead_id: payload.shapeLeadId,
-      transcript_created: created,
-      ai_status_label: evaluation.status.status_label,
-      ai_status_color: evaluation.status.color,
-      status_rationale: evaluation.statusRationale,
-      call_summary: evaluation.callSummary,
-      fields_populated: evaluation.fieldsPopulated,
-      shape_sync: shapeSync,
-      lead: {
-        full_name: updatedLead.full_name,
-        phone_number: updatedLead.phone_number,
-        email: updatedLead.email,
-        current_status_label: updatedLead.current_status_label,
-        current_status_color: updatedLead.current_status_color,
-      },
-      notification: email,
-    });
+    const result = await processTranscriptPipeline(payload);
+    return sendJson(res, 200, result);
   } catch (error) {
     console.error('[zoom-transcript] failed:', error);
 
@@ -163,3 +134,7 @@ export default async function handler(req, res) {
     return sendJson(res, statusCode, { error: message });
   }
 }
+
+export const config = {
+  maxDuration: 300,
+};
