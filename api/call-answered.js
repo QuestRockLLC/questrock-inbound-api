@@ -13,20 +13,16 @@ function parseCallAnsweredPayload(body) {
     missing.push('shape_lead_id');
   }
 
-  if (!normalized.callerName) {
-    missing.push('caller_name');
+  if (!normalized.callerName && !normalized.fullName) {
+    missing.push('caller_name (or first_name + last_name)');
   }
 
   if (!normalized.callerPhone) {
     missing.push('caller_phone');
   }
 
-  if (!normalized.calleeName) {
-    missing.push('callee_name');
-  }
-
-  if (!normalized.calleePhone && !normalized.calleeName) {
-    missing.push('callee_phone');
+  if (!normalized.calleeName && !normalized.calleePhone && !normalized.loName) {
+    missing.push('callee_name, callee_phone, or lo_name');
   }
 
   if (!normalized.timestamp) {
@@ -57,7 +53,17 @@ function parseCallAnsweredPayload(body) {
 
   const leadNameRaw =
     normalized.fullName ??
-    (direction === 'inbound' ? normalized.callerName : normalized.calleeName);
+    normalized.callerName ??
+    (direction === 'inbound' ? normalized.callerName : normalized.calleeName) ??
+    'Unknown Caller';
+
+  const callerName =
+    normalized.callerName ?? normalized.fullName ?? leadNameRaw;
+
+  const calleeName =
+    normalized.calleeName ??
+    normalized.loName ??
+    (normalized.calleePhone ? `Extension ${normalized.calleePhone}` : 'Unknown LO');
 
   const callId =
     normalized.callId ??
@@ -78,7 +84,9 @@ function parseCallAnsweredPayload(body) {
     state: normalized.state ?? null,
     zipCode: normalized.zipCode ?? null,
     companyName: normalized.companyName ?? null,
-    loName: normalized.loName ?? null,
+    loName: normalized.loName ?? normalized.calleeName ?? null,
+    callerName,
+    calleeName,
   };
 }
 
