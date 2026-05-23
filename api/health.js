@@ -64,6 +64,7 @@ export default async function handler(req, res) {
     endpoints: [
       'POST /api/call-answered',
       'POST /api/zoom-transcript',
+      'POST /api/re-evaluate-transcript',
       'POST /api/lo-note',
     ],
   };

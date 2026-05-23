@@ -3,6 +3,9 @@
     "api/zoom-transcript.js": {
       "maxDuration": 300
     },
+    "api/re-evaluate-transcript.js": {
+      "maxDuration": 300
+    },
     "api/call-answered.js": {
       "maxDuration": 60
     },
