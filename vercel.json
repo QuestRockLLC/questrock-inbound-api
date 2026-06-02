@@ -11,6 +11,9 @@
     },
     "api/lo-note.js": {
       "maxDuration": 60
+    },
+    "api/import-mailer-list.js": {
+      "maxDuration": 300
     }
   }
 }

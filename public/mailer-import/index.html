@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QuestRock — Thursday Mailer Import</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Playfair+Display:wght@600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <style>
+      :root {
+        --bg: #f4f1ea;
+        --card: #fffdf8;
+        --ink: #1f2a24;
+        --muted: #5f6d66;
+        --accent: #2d6a4f;
+        --accent-soft: #d8f3dc;
+        --danger: #9b2226;
+        --border: #d8ddd8;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: 'DM Sans', system-ui, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top right, rgba(45, 106, 79, 0.12), transparent 40%),
+          var(--bg);
+        min-height: 100vh;
+      }
+
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 2rem 1.25rem 3rem;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+
+      h1 {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: clamp(1.6rem, 3vw, 2.2rem);
+        margin: 0 0 0.25rem;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        margin: 0;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 10px 30px rgba(31, 42, 36, 0.05);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+      }
+
+      label {
+        display: block;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 0.35rem;
+      }
+
+      input[type='text'],
+      input[type='password'],
+      input[type='file'] {
+        width: 100%;
+        padding: 0.65rem 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        font: inherit;
+        background: #fff;
+      }
+
+      .dropzone {
+        border: 2px dashed var(--border);
+        border-radius: 14px;
+        padding: 2rem 1rem;
+        text-align: center;
+        background: #faf9f6;
+        cursor: pointer;
+        transition: border-color 0.15s, background 0.15s;
+      }
+
+      .dropzone.dragover {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1rem;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 0.7rem 1.2rem;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      button.primary {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      button.secondary {
+        background: #eceae4;
+        color: var(--ink);
+      }
+
+      button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        background: #eceae4;
+      }
+
+      .status.ok {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      .status.err {
+        background: #ffe5e5;
+        color: var(--danger);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.85rem;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--border);
+        padding: 0.55rem 0.45rem;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+      }
+
+      .table-wrap {
+        overflow: auto;
+        max-height: 360px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+
+      pre {
+        background: #111;
+        color: #d8f3dc;
+        padding: 1rem;
+        border-radius: 12px;
+        overflow: auto;
+        font-size: 0.8rem;
+      }
+
+      .hint {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+      }
+
+      .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div>
+          <h1>Thursday Mailer Import</h1>
+          <p class="subtitle">Upload the weekly data partner spreadsheet → Supabase + Shape CRM</p>
+        </div>
+        <span id="status-badge" class="status">Ready</span>
+      </header>
+
+      <section class="card">
+        <div class="grid">
+          <div>
+            <label for="import-secret">Import password</label>
+            <input id="import-secret" type="password" placeholder="Same as MAILER_IMPORT_SECRET in Vercel" />
+          </div>
+          <div>
+            <label for="batch-label">Batch label</label>
+            <input id="batch-label" type="text" placeholder="2026-05-15 Thursday drop" />
+          </div>
+        </div>
+        <label class="checkbox-row">
+          <input id="sync-shape" type="checkbox" checked />
+          Also create leads in Shape CRM
+        </label>
+      </section>
+
+      <section class="card">
+        <label>Spreadsheet file (.csv or .xlsx)</label>
+        <div id="dropzone" class="dropzone" tabindex="0">
+          <p><strong>Drop file here</strong> or click to browse</p>
+          <p class="hint">Expected columns: Full Name, Address, Offer Code, MTGAMT, LENDER, Mail Date, Expir, …</p>
+        </div>
+        <input id="file-input" type="file" accept=".csv,.xlsx,.xls" hidden />
+        <div class="actions">
+          <button id="preview-btn" class="secondary" disabled>Preview import</button>
+          <button id="import-btn" class="primary" disabled>Import to database + Shape</button>
+        </div>
+        <p id="file-meta" class="hint"></p>
+      </section>
+
+      <section class="card">
+        <h2 style="margin-top: 0; font-size: 1.1rem">Preview</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Offer Code</th>
+                <th>Name</th>
+                <th>City</th>
+                <th>State</th>
+                <th>MTGAMT</th>
+                <th>Mail Date</th>
+              </tr>
+            </thead>
+            <tbody id="preview-body">
+              <tr>
+                <td colspan="7" style="color: var(--muted)">No file loaded yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 style="margin-top: 0; font-size: 1.1rem">Result</h2>
+        <pre id="result">{}</pre>
+      </section>
+    </div>
+
+    <script>
+      const secretInput = document.getElementById('import-secret');
+      const batchInput = document.getElementById('batch-label');
+      const syncShapeInput = document.getElementById('sync-shape');
+      const dropzone = document.getElementById('dropzone');
+      const fileInput = document.getElementById('file-input');
+      const previewBtn = document.getElementById('preview-btn');
+      const importBtn = document.getElementById('import-btn');
+      const previewBody = document.getElementById('preview-body');
+      const resultEl = document.getElementById('result');
+      const statusBadge = document.getElementById('status-badge');
+      const fileMeta = document.getElementById('file-meta');
+
+      let parsedRows = [];
+
+      const savedSecret = sessionStorage.getItem('mailerImportSecret');
+      if (savedSecret) {
+        secretInput.value = savedSecret;
+      }
+
+      if (!batchInput.value) {
+        batchInput.value = new Date().toISOString().slice(0, 10);
+      }
+
+      function setStatus(text, kind) {
+        statusBadge.textContent = text;
+        statusBadge.className = 'status' + (kind ? ' ' + kind : '');
+      }
+
+      function normalizeKey(key) {
+        return String(key || '')
+          .trim()
+          .toLowerCase()
+          .replace(/[_-]+/g, ' ')
+          .replace(/\s+/g, ' ');
+      }
+
+      function pick(row, aliases) {
+        const map = {};
+        for (const [k, v] of Object.entries(row)) {
+          map[normalizeKey(k)] = v;
+        }
+        for (const alias of aliases) {
+          if (map[alias] !== undefined && map[alias] !== null && String(map[alias]).trim() !== '') {
+            return String(map[alias]).trim();
+          }
+        }
+        return '';
+      }
+
+      function renderPreview(rows) {
+        if (!rows.length) {
+          previewBody.innerHTML =
+            '<tr><td colspan="7" style="color: var(--muted)">No rows found in file.</td></tr>';
+          return;
+        }
+
+        previewBody.innerHTML = rows
+          .slice(0, 25)
+          .map((row, index) => {
+            const offer = pick(row, ['offer code', 'offercode', 'reference code']);
+            const name = pick(row, ['full name', 'fullname', 'name']);
+            const city = pick(row, ['city']);
+            const state = pick(row, ['state']);
+            const mtg = pick(row, ['mtgamt', 'mtg amount']);
+            const mailDate = pick(row, ['mail date', 'maildate']);
+            return `<tr>
+              <td>${index + 1}</td>
+              <td>${offer || '—'}</td>
+              <td>${name || '—'}</td>
+              <td>${city || '—'}</td>
+              <td>${state || '—'}</td>
+              <td>${mtg || '—'}</td>
+              <td>${mailDate || '—'}</td>
+            </tr>`;
+          })
+          .join('');
+      }
+
+      function parseWorkbook(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            try {
+              const data = new Uint8Array(event.target.result);
+              const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+              const sheetName = workbook.SheetNames[0];
+              const sheet = workbook.Sheets[sheetName];
+              const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+              resolve(rows);
+            } catch (error) {
+              reject(error);
+            }
+          };
+          reader.onerror = () => reject(reader.error);
+          reader.readAsArrayBuffer(file);
+        });
+      }
+
+      async function handleFile(file) {
+        if (!file) return;
+        setStatus('Parsing…', '');
+        parsedRows = await parseWorkbook(file);
+        renderPreview(parsedRows);
+        previewBtn.disabled = !parsedRows.length;
+        importBtn.disabled = !parsedRows.length;
+        fileMeta.textContent = `${file.name} — ${parsedRows.length} row(s) loaded`;
+        setStatus('File loaded', 'ok');
+      }
+
+      async function callImport({ dryRun }) {
+        const secret = secretInput.value.trim();
+        if (!secret) {
+          throw new Error('Enter the import password first.');
+        }
+
+        sessionStorage.setItem('mailerImportSecret', secret);
+
+        const response = await fetch('/api/import-mailer-list', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-mailer-import-secret': secret,
+          },
+          body: JSON.stringify({
+            batch_label: batchInput.value.trim(),
+            sync_shape: syncShapeInput.checked,
+            dry_run: dryRun,
+            rows: parsedRows,
+          }),
+        });
+
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || `Import failed (${response.status})`);
+        }
+
+        return payload;
+      }
+
+      dropzone.addEventListener('click', () => fileInput.click());
+      dropzone.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          fileInput.click();
+        }
+      });
+      dropzone.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        dropzone.classList.add('dragover');
+      });
+      dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+      dropzone.addEventListener('drop', (event) => {
+        event.preventDefault();
+        dropzone.classList.remove('dragover');
+        handleFile(event.dataTransfer.files[0]).catch(showError);
+      });
+      fileInput.addEventListener('change', () => {
+        handleFile(fileInput.files[0]).catch(showError);
+      });
+
+      function showError(error) {
+        setStatus('Error', 'err');
+        resultEl.textContent = JSON.stringify({ ok: false, error: error.message }, null, 2);
+      }
+
+      previewBtn.addEventListener('click', async () => {
+        try {
+          setStatus('Previewing…', '');
+          previewBtn.disabled = true;
+          const payload = await callImport({ dryRun: true });
+          resultEl.textContent = JSON.stringify(payload, null, 2);
+          setStatus('Preview ready', 'ok');
+        } catch (error) {
+          showError(error);
+        } finally {
+          previewBtn.disabled = !parsedRows.length;
+        }
+      });
+
+      importBtn.addEventListener('click', async () => {
+        const confirmed = window.confirm(
+          `Import ${parsedRows.length} row(s) into Supabase${syncShapeInput.checked ? ' and Shape CRM' : ''}?`,
+        );
+        if (!confirmed) return;
+
+        try {
+          setStatus('Importing…', '');
+          importBtn.disabled = true;
+          previewBtn.disabled = true;
+          const payload = await callImport({ dryRun: false });
+          resultEl.textContent = JSON.stringify(payload, null, 2);
+          setStatus('Import complete', 'ok');
+        } catch (error) {
+          showError(error);
+        } finally {
+          importBtn.disabled = !parsedRows.length;
+          previewBtn.disabled = !parsedRows.length;
+        }
+      });
+    </script>
+  </body>
+</html>
