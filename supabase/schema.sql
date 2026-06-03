@@ -52,4 +52,4 @@ create unique index if not exists transcripts_external_call_id_key
 
 create index if not exists transcripts_lead_id_key on public.transcripts (lead_id);
 
--- See supabase/migrations/002_mailer_leads.sql for Thursday mailer import tables.
+-- See supabase/migrations/002_mailer_leads.sql and 003_mailer_lo_desk.sql for mailer tables.

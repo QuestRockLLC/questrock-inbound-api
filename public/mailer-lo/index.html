@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QuestRock — Mailer LO Desk</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Playfair+Display:wght@600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #eef2f0;
+        --card: #fffdf8;
+        --ink: #1f2a24;
+        --muted: #5f6d66;
+        --accent: #2d6a4f;
+        --accent-soft: #d8f3dc;
+        --border: #d8ddd8;
+        --warn: #9a6700;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: 'DM Sans', system-ui, sans-serif;
+        color: var(--ink);
+        background: var(--bg);
+        min-height: 100vh;
+      }
+      .wrap { max-width: 1280px; margin: 0 auto; padding: 1.25rem; }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+      h1 {
+        font-family: 'Playfair Display', Georgia, serif;
+        margin: 0;
+        font-size: 1.75rem;
+      }
+      .sub { color: var(--muted); margin: 0.25rem 0 0; font-size: 0.95rem; }
+      .nav a { color: var(--accent); margin-left: 1rem; font-weight: 600; }
+      .layout {
+        display: grid;
+        grid-template-columns: 340px 1fr;
+        gap: 1rem;
+        align-items: start;
+      }
+      @media (max-width: 900px) {
+        .layout { grid-template-columns: 1fr; }
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+      }
+      label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.3rem; }
+      input, textarea, button {
+        font: inherit;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+      }
+      input, textarea {
+        width: 100%;
+        padding: 0.6rem 0.75rem;
+        background: #fff;
+      }
+      button {
+        padding: 0.55rem 1rem;
+        border: 0;
+        font-weight: 600;
+        cursor: pointer;
+        background: var(--accent);
+        color: #fff;
+      }
+      button.secondary { background: #e8ebe9; color: var(--ink); }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      .search-row { display: flex; gap: 0.5rem; }
+      .search-row input { flex: 1; }
+      .results { max-height: 420px; overflow: auto; }
+      .result-item {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        margin-bottom: 0.5rem;
+        background: #fff;
+        cursor: pointer;
+      }
+      .result-item:hover, .result-item.active {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .result-item strong { display: block; }
+      .result-item span { font-size: 0.85rem; color: var(--muted); }
+      .pill {
+        display: inline-block;
+        font-size: 0.75rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+      .tabs button { background: #e8ebe9; color: var(--ink); }
+      .tabs button.active { background: var(--accent); color: #fff; }
+      .panel { display: none; }
+      .panel.active { display: block; }
+      .brief {
+        background: #f0f7f2;
+        border-left: 4px solid var(--accent);
+        padding: 1rem;
+        border-radius: 8px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+      }
+      .script-box {
+        background: #1f2a24;
+        color: #e8f5e9;
+        padding: 1rem;
+        border-radius: 10px;
+        max-height: 480px;
+        overflow: auto;
+        white-space: pre-wrap;
+        line-height: 1.5;
+        font-size: 0.9rem;
+      }
+      .history-item {
+        border-left: 3px solid var(--border);
+        padding: 0.5rem 0 0.5rem 0.75rem;
+        margin-bottom: 0.65rem;
+      }
+      .history-item time { font-size: 0.75rem; color: var(--muted); }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+      }
+      .empty { color: var(--muted); padding: 2rem 1rem; text-align: center; }
+      .status { font-size: 0.85rem; padding: 0.35rem 0.65rem; border-radius: 999px; background: #e8ebe9; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div>
+          <h1>Mailer LO Desk</h1>
+          <p class="sub">Search mailer leads · assign · history · call script · this week's mail</p>
+        </div>
+        <div class="nav">
+          <a href="/mailer-import/">Admin import</a>
+        </div>
+      </header>
+
+      <div class="card">
+        <div class="grid2">
+          <div>
+            <label for="desk-secret">Desk password</label>
+            <input id="desk-secret" type="password" placeholder="MAILER_IMPORT_SECRET" />
+          </div>
+          <div>
+            <label for="lo-name">Your name (for assign + script)</label>
+            <input id="lo-name" type="text" placeholder="e.g. Nikk Smith" />
+          </div>
+        </div>
+      </div>
+
+      <div class="layout">
+        <aside>
+          <div class="card">
+            <label for="search-q">Search Supabase mailer leads</label>
+            <div class="search-row">
+              <input id="search-q" type="text" placeholder="Name, offer code, address, phone…" />
+              <button id="search-btn" type="button">Search</button>
+            </div>
+            <p style="font-size:0.8rem;color:var(--muted);margin:0.5rem 0 0">Try NIKK00001, Nikk Test, or a street name</p>
+          </div>
+          <div class="card results" id="results"></div>
+        </aside>
+
+        <main>
+          <div id="lead-empty" class="card empty">Select a lead from search results</div>
+          <div id="lead-detail" hidden>
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">
+                <div>
+                  <h2 id="lead-name" style="margin:0"></h2>
+                  <p id="lead-meta" class="sub"></p>
+                </div>
+                <span id="lead-assigned" class="pill"></span>
+              </div>
+              <div id="lead-brief" class="brief" style="margin-top:1rem"></div>
+              <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap">
+                <button id="assign-btn" type="button">Assign to me</button>
+                <button id="open-shape" type="button" class="secondary" hidden>Open in Shape</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="tabs">
+                <button type="button" data-tab="script" class="active">Call script</button>
+                <button type="button" data-tab="mail">This week's mail</button>
+                <button type="button" data-tab="history">History</button>
+                <button type="button" data-tab="fields">All fields</button>
+              </div>
+              <div id="panel-script" class="panel active">
+                <p class="sub" style="margin-top:0">Read this while on the phone — personalized from the lead record.</p>
+                <div id="call-script" class="script-box"></div>
+              </div>
+              <div id="panel-mail" class="panel">
+                <h3 id="week-label" style="margin-top:0"></h3>
+                <p id="week-meta" class="sub"></p>
+                <p><a id="pdf-link" href="#" target="_blank" rel="noopener">Open mail PDF for this week</a></p>
+                <p class="sub">Upload PDF URL in Vercel as <code>MAILER_CURRENT_WEEK_PDF_URL</code> or add a row in <code>mailer_campaigns</code>.</p>
+              </div>
+              <div id="panel-history" class="panel">
+                <div id="history-list"></div>
+              </div>
+              <div id="panel-fields" class="panel">
+                <pre id="fields-json" style="font-size:0.8rem;overflow:auto;max-height:400px;background:#f5f5f4;padding:1rem;border-radius:8px"></pre>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      const secretInput = document.getElementById('desk-secret');
+      const loNameInput = document.getElementById('lo-name');
+      const searchInput = document.getElementById('search-q');
+      const resultsEl = document.getElementById('results');
+      const leadEmpty = document.getElementById('lead-empty');
+      const leadDetail = document.getElementById('lead-detail');
+
+      let selectedRef = null;
+      let campaignCache = null;
+
+      const savedSecret = sessionStorage.getItem('mailerImportSecret');
+      const savedLo = sessionStorage.getItem('mailerLoName');
+      if (savedSecret) secretInput.value = savedSecret;
+      if (savedLo) loNameInput.value = savedLo;
+
+      function authQuery() {
+        const secret = secretInput.value.trim();
+        if (!secret) throw new Error('Enter desk password first.');
+        sessionStorage.setItem('mailerImportSecret', secret);
+        sessionStorage.setItem('mailerLoName', loNameInput.value.trim());
+        return secret;
+      }
+
+      async function apiGet(path) {
+        const secret = authQuery();
+        const sep = path.includes('?') ? '&' : '?';
+        const res = await fetch(`${path}${sep}import_secret=${encodeURIComponent(secret)}`, {
+          headers: { 'x-mailer-import-secret': secret },
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || `Request failed (${res.status})`);
+        return data;
+      }
+
+      async function apiPost(path, body) {
+        const secret = authQuery();
+        const res = await fetch(path, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-mailer-import-secret': secret,
+          },
+          body: JSON.stringify({ import_secret: secret, ...body }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || `Request failed (${res.status})`);
+        return data;
+      }
+
+      function renderResults(rows) {
+        if (!rows.length) {
+          resultsEl.innerHTML = '<p class="empty">No matches</p>';
+          return;
+        }
+        resultsEl.innerHTML = rows
+          .map(
+            (r) => `
+          <button type="button" class="result-item" data-ref="${r.reference_code}">
+            <strong>${r.full_name || 'Unknown'}</strong>
+            <span>${r.reference_code} · ${r.city || ''}, ${r.state || ''}</span>
+            <span>${r.address_line_1 || ''}</span>
+            ${r.assigned_lo_name ? `<span class="pill">${r.assigned_lo_name}</span>` : ''}
+          </button>`,
+          )
+          .join('');
+        resultsEl.querySelectorAll('.result-item').forEach((btn) => {
+          btn.addEventListener('click', () => loadLead(btn.dataset.ref, btn));
+        });
+      }
+
+      function formatBrief(text) {
+        return text
+          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\n\n/g, '<br><br>')
+          .replace(/\n/g, '<br>');
+      }
+
+      async function loadLead(referenceCode, activeBtn) {
+        selectedRef = referenceCode;
+        resultsEl.querySelectorAll('.result-item').forEach((el) => el.classList.remove('active'));
+        if (activeBtn) activeBtn.classList.add('active');
+
+        const lo = loNameInput.value.trim();
+        const data = await apiGet(
+          `/api/mailer-lo/lead?reference_code=${encodeURIComponent(referenceCode)}&lo_name=${encodeURIComponent(lo)}`,
+        );
+
+        leadEmpty.hidden = true;
+        leadDetail.hidden = false;
+
+        const m = data.mailer_lead;
+        document.getElementById('lead-name').textContent = m.full_name || 'Unknown';
+        document.getElementById('lead-meta').textContent = `${m.reference_code} · ${m.address_line_1}, ${m.city}, ${m.state} ${m.zip_code}`;
+        document.getElementById('lead-assigned').textContent = m.assigned_lo_name
+          ? `Assigned: ${m.assigned_lo_name}`
+          : 'Unassigned';
+        document.getElementById('lead-brief').innerHTML = formatBrief(data.brief);
+        document.getElementById('call-script').textContent = data.call_script;
+
+        const shapeBtn = document.getElementById('open-shape');
+        if (m.shape_lead_id) {
+          shapeBtn.hidden = false;
+          shapeBtn.onclick = () =>
+            window.open(`https://secure.setshape.com/lead/${m.shape_lead_id}`, '_blank');
+        } else {
+          shapeBtn.hidden = true;
+        }
+
+        document.getElementById('history-list').innerHTML = (data.history || [])
+          .map(
+            (h) => `
+          <div class="history-item">
+            <time>${new Date(h.at).toLocaleString()}</time>
+            <strong>${h.title}</strong>
+            <div>${h.detail || ''}${h.ai_status_label ? ` · ${h.ai_status_label}` : ''}</div>
+          </div>`,
+          )
+          .join('') || '<p class="empty">No history yet</p>';
+
+        document.getElementById('fields-json').textContent = JSON.stringify(m, null, 2);
+      }
+
+      async function loadCampaign() {
+        if (campaignCache) return campaignCache;
+        campaignCache = await apiGet('/api/mailer-lo/campaign');
+        const c = campaignCache.campaign;
+        document.getElementById('week-label').textContent = c.week_label || "This week's mail";
+        document.getElementById('week-meta').textContent = c.mail_drop_date
+          ? `Mail drop: ${c.mail_drop_date}`
+          : 'Weekly refinance mailer';
+        const pdf = document.getElementById('pdf-link');
+        if (c.pdf_url) {
+          pdf.href = c.pdf_url;
+          pdf.textContent = 'Open mail PDF for this week';
+        } else {
+          pdf.href = '#';
+          pdf.textContent = 'PDF not configured yet';
+          pdf.onclick = (e) => e.preventDefault();
+        }
+        return campaignCache;
+      }
+
+      document.getElementById('search-btn').addEventListener('click', async () => {
+        try {
+          const q = searchInput.value.trim();
+          const data = await apiGet(`/api/mailer-lo/search?q=${encodeURIComponent(q)}`);
+          renderResults(data.results);
+        } catch (e) {
+          resultsEl.innerHTML = `<p class="empty" style="color:#9b2226">${e.message}</p>`;
+        }
+      });
+
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('search-btn').click();
+      });
+
+      document.getElementById('assign-btn').addEventListener('click', async () => {
+        if (!selectedRef) return;
+        try {
+          await apiPost('/api/mailer-lo/assign', {
+            reference_code: selectedRef,
+            lo_name: loNameInput.value.trim() || 'LO',
+          });
+          await loadLead(selectedRef);
+        } catch (e) {
+          alert(e.message);
+        }
+      });
+
+      document.querySelectorAll('.tabs button').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          document.querySelectorAll('.tabs button').forEach((b) => b.classList.remove('active'));
+          document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
+          btn.classList.add('active');
+          document.getElementById(`panel-${btn.dataset.tab}`).classList.add('active');
+          if (btn.dataset.tab === 'mail') await loadCampaign();
+        });
+      });
+
+      loadCampaign().catch(() => {});
+    </script>
+  </body>
+</html>
