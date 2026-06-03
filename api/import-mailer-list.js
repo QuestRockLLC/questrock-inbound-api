@@ -6,7 +6,7 @@ import { assertImportAuthorized, readJsonBody, sendJson } from '../lib/http.js';
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
-      assertImportAuthorized(req);
+      assertImportAuthorized(req, null);
       const supabase = getSupabaseClient();
       const limit = Math.min(Number(req.query?.limit) || 10, 50);
 
@@ -25,6 +25,7 @@ export default async function handler(req, res) {
       return sendJson(res, error.statusCode || 500, {
         ok: false,
         error: error.message || 'Failed to load import batches.',
+        auth_hint: error.authHint,
       });
     }
   }
@@ -35,9 +36,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    assertImportAuthorized(req);
-
     const body = readJsonBody(req);
+    assertImportAuthorized(req, body);
     const rawRows = Array.isArray(body.rows) ? body.rows : [];
     const batchLabel = String(body.batch_label || body.batchLabel || '').trim() ||
       new Date().toISOString().slice(0, 10);
@@ -75,9 +75,19 @@ export default async function handler(req, res) {
       skipped_before_import: skipped,
     });
   } catch (error) {
-    return sendJson(res, error.statusCode || 500, {
+    const status = error.statusCode || 500;
+    return sendJson(res, status, {
       ok: false,
       error: error.message || 'Mailer import failed.',
+      auth_hint:
+        error.authHint ??
+        (status === 401
+          ? {
+              mailer_secret_configured: Boolean(
+                String(process.env.MAILER_IMPORT_SECRET ?? '').trim(),
+              ),
+            }
+          : undefined),
     });
   }
 }

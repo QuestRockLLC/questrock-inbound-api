@@ -408,6 +408,7 @@
             'x-mailer-import-secret': secret,
           },
           body: JSON.stringify({
+            import_secret: secret,
             batch_label: batchInput.value.trim(),
             sync_shape: syncShapeInput.checked,
             dry_run: dryRun,
@@ -424,9 +425,12 @@
 
         if (!response.ok || !payload.ok) {
           if (response.status === 401) {
+            const hint = payload.auth_hint
+              ? ` [configured=${payload.auth_hint.mailer_secret_configured}, sent=${payload.auth_hint.secret_provided}, via=${payload.auth_hint.provided_via}]`
+              : '';
             throw new Error(
-              payload.error ||
-                '401 Unauthorized — set MAILER_IMPORT_SECRET in Vercel to match this page password, redeploy, then try again. (File preview alone does not call the API; nothing was saved yet.)',
+              (payload.error ||
+                '401 Unauthorized — MAILER_IMPORT_SECRET in Vercel must match the password on this page. Redeploy after saving the env var.') + hint,
             );
           }
           throw new Error(payload.error || `Import failed (${response.status})`);
