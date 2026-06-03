@@ -243,11 +243,11 @@
         <label>Spreadsheet file (.csv or .xlsx)</label>
         <div id="dropzone" class="dropzone" tabindex="0">
           <p><strong>Drop file here</strong> or click to browse</p>
-          <p class="hint">Expected columns: Full Name, Address, Offer Code, MTGAMT, LENDER, Mail Date, Expir, …</p>
+          <p class="hint">Expected columns: Full Name, Address, Offer Code, MTGAMT, LENDER, Mail Date, Expir, …<br />Table above is local only. <strong>Test API</strong> or <strong>Import</strong> hits the server (needs Vercel <code>MAILER_IMPORT_SECRET</code>).</p>
         </div>
         <input id="file-input" type="file" accept=".csv,.xlsx,.xls" hidden />
         <div class="actions">
-          <button id="preview-btn" class="secondary" disabled>Preview import</button>
+          <button id="preview-btn" class="secondary" disabled>Test API (dry run)</button>
           <button id="import-btn" class="primary" disabled>Import to database + Shape</button>
         </div>
         <p id="file-meta" class="hint"></p>
@@ -415,8 +415,20 @@
           }),
         });
 
-        const payload = await response.json();
+        let payload = {};
+        try {
+          payload = await response.json();
+        } catch {
+          payload = {};
+        }
+
         if (!response.ok || !payload.ok) {
+          if (response.status === 401) {
+            throw new Error(
+              payload.error ||
+                '401 Unauthorized — set MAILER_IMPORT_SECRET in Vercel to match this page password, redeploy, then try again. (File preview alone does not call the API; nothing was saved yet.)',
+            );
+          }
           throw new Error(payload.error || `Import failed (${response.status})`);
         }
 
