@@ -396,7 +396,15 @@
         setStatus('File loaded', 'ok');
       }
 
-      async function callImport({ dryRun }) {
+      const CHUNK_SIZE = 10;
+
+      async function callImport({
+        dryRun,
+        rows = parsedRows,
+        batchId = null,
+        deferShape = false,
+        shapeSyncOnly = false,
+      }) {
         const secret = secretInput.value.trim();
         if (!secret) {
           throw new Error('Enter the import password first.');
@@ -413,9 +421,12 @@
           body: JSON.stringify({
             import_secret: secret,
             batch_label: batchInput.value.trim(),
-            sync_shape: syncShapeInput.checked,
+            sync_shape: syncShapeInput.checked && !deferShape && !shapeSyncOnly,
+            defer_shape: deferShape,
+            shape_sync_only: shapeSyncOnly,
             dry_run: dryRun,
-            rows: parsedRows,
+            batch_id: batchId,
+            rows,
           }),
         });
 
@@ -426,7 +437,7 @@
           payload = {};
         }
 
-        if (!response.ok || !payload.ok) {
+        if ((!response.ok && response.status !== 202) || !payload.ok) {
           if (response.status === 401) {
             const hint = payload.auth_hint
               ? ` [configured=${payload.auth_hint.mailer_secret_configured}, sent=${payload.auth_hint.secret_provided}, via=${payload.auth_hint.provided_via}]`
@@ -492,9 +503,89 @@
           setStatus('Importing…', '');
           importBtn.disabled = true;
           previewBtn.disabled = true;
-          const payload = await callImport({ dryRun: false });
-          resultEl.textContent = JSON.stringify(payload, null, 2);
-          setStatus('Import complete', 'ok');
+
+          const aggregated = {
+            ok: true,
+            batch_id: null,
+            chunks: [],
+            summary: {
+              total: parsedRows.length,
+              db_upserted: 0,
+              shape_created: 0,
+              shape_skipped: 0,
+              shape_failed: 0,
+              errors: [],
+            },
+            async_shape_sync: false,
+          };
+
+          let batchId = null;
+          const useChunks = parsedRows.length > CHUNK_SIZE;
+
+          for (let start = 0; start < parsedRows.length; start += CHUNK_SIZE) {
+            const chunk = parsedRows.slice(start, start + CHUNK_SIZE);
+            const chunkNum = Math.floor(start / CHUNK_SIZE) + 1;
+            const totalChunks = Math.ceil(parsedRows.length / CHUNK_SIZE);
+            setStatus(
+              useChunks ? `Importing chunk ${chunkNum}/${totalChunks}…` : 'Importing…',
+              '',
+            );
+
+            const deferShape = syncShapeInput.checked && parsedRows.length >= 8;
+            const payload = await callImport({
+              dryRun: false,
+              rows: chunk,
+              batchId,
+              deferShape: useChunks ? true : deferShape,
+            });
+
+            if (!batchId) batchId = payload.batch_id;
+            aggregated.batch_id = batchId;
+            aggregated.chunks.push(payload);
+            aggregated.async_shape_sync =
+              aggregated.async_shape_sync || Boolean(payload.async_shape_sync);
+
+            const s = payload.summary || {};
+            aggregated.summary.db_upserted += s.db_upserted || 0;
+            aggregated.summary.shape_created += s.shape_created || 0;
+            aggregated.summary.shape_skipped += s.shape_skipped || 0;
+            aggregated.summary.shape_failed += s.shape_failed || 0;
+            if (s.errors?.length) aggregated.summary.errors.push(...s.errors);
+          }
+
+          if (syncShapeInput.checked && useChunks && batchId) {
+            setStatus('Syncing Shape…', '');
+            const shapePayload = await callImport({
+              dryRun: false,
+              rows: parsedRows,
+              batchId,
+              shapeSyncOnly: true,
+            });
+            aggregated.shape_sync = shapePayload;
+            if (shapePayload.async_shape_sync) {
+              aggregated.async_shape_sync = true;
+              aggregated.message = `${aggregated.summary.db_upserted} rows in Supabase. Shape sync running in background.`;
+            } else if (shapePayload.summary) {
+              aggregated.summary.shape_created += shapePayload.summary.shape_created || 0;
+              aggregated.summary.shape_failed += shapePayload.summary.shape_failed || 0;
+              if (shapePayload.summary.errors?.length) {
+                aggregated.summary.errors.push(...shapePayload.summary.errors);
+              }
+            }
+          }
+
+          if (aggregated.async_shape_sync) {
+            aggregated.message =
+              `${aggregated.summary.db_upserted} rows in Supabase. Shape sync running in background — refresh Shape in a few minutes.`;
+          }
+
+          resultEl.textContent = JSON.stringify(aggregated, null, 2);
+          setStatus(
+            aggregated.summary.errors.length
+              ? `Done with ${aggregated.summary.errors.length} error(s)`
+              : 'Import complete',
+            aggregated.summary.errors.length ? 'err' : 'ok',
+          );
         } catch (error) {
           showError(error);
         } finally {
