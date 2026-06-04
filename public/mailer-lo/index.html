@@ -20,6 +20,7 @@
         --accent-soft: #d8f3dc;
         --border: #d8ddd8;
         --warn: #9a6700;
+        --danger: #b42318;
       }
       * { box-sizing: border-box; }
       body {
@@ -165,7 +166,22 @@
         gap: 0.75rem;
       }
       .empty { color: var(--muted); padding: 2rem 1rem; text-align: center; }
-      .status { font-size: 0.85rem; padding: 0.35rem 0.65rem; border-radius: 999px; background: #e8ebe9; }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        background: #e8ebe9;
+      }
+      .status.ok {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .status.err {
+        background: #ffe5e5;
+        color: var(--danger);
+      }
     </style>
   </head>
   <body>
@@ -175,8 +191,9 @@
           <h1>Mailer LO Desk</h1>
           <p class="sub">Search mailer leads · assign · history · call script · this week's mail</p>
         </div>
-        <div class="nav">
+        <div class="nav" style="display:flex;align-items:center;gap:1rem">
           <a href="/mailer-import/">Admin import</a>
+          <span id="status-badge" class="status">Ready</span>
         </div>
       </header>
 
@@ -270,8 +287,14 @@
         });
       });
 
+      const statusBadge = document.getElementById('status-badge');
       const secretInput = document.getElementById('desk-secret');
       const loNameInput = document.getElementById('lo-name');
+
+      function setStatus(text, kind) {
+        statusBadge.textContent = text;
+        statusBadge.className = 'status' + (kind ? ` ${kind}` : '');
+      }
       const searchInput = document.getElementById('search-q');
       const resultsEl = document.getElementById('results');
       const leadEmpty = document.getElementById('lead-empty');
