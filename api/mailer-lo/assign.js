@@ -20,7 +20,8 @@ export default async function handler(req, res) {
       note: body.note,
     });
 
-    return sendJson(res, 200, { ok: true, ...result });
+    const status = result.ok === false ? 422 : 200;
+    return sendJson(res, status, result);
   } catch (error) {
     return sendJson(res, error.statusCode || 500, {
       ok: false,

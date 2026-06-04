@@ -95,6 +95,24 @@
         background: #fff;
       }
 
+      .password-wrap {
+        display: flex;
+        gap: 0.35rem;
+        align-items: stretch;
+      }
+
+      .password-wrap input {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .password-wrap .password-toggle {
+        flex-shrink: 0;
+        padding: 0.65rem 0.85rem;
+        font-size: 0.8rem;
+        white-space: nowrap;
+      }
+
       .dropzone {
         border: 2px dashed var(--border);
         border-radius: 14px;
@@ -229,7 +247,10 @@
         <div class="grid">
           <div>
             <label for="import-secret">Import password</label>
-            <input id="import-secret" type="password" placeholder="Same as MAILER_IMPORT_SECRET in Vercel" />
+            <div class="password-wrap">
+              <input id="import-secret" type="password" placeholder="Same as MAILER_IMPORT_SECRET in Vercel" autocomplete="current-password" />
+              <button type="button" class="secondary password-toggle" data-target="import-secret" aria-label="Show password">Show</button>
+            </div>
           </div>
           <div>
             <label for="batch-label">Batch label</label>
@@ -287,6 +308,16 @@
     </div>
 
     <script>
+      document.querySelectorAll('.password-toggle').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const input = document.getElementById(btn.dataset.target);
+          const show = input.type === 'password';
+          input.type = show ? 'text' : 'password';
+          btn.textContent = show ? 'Hide' : 'Show';
+          btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        });
+      });
+
       const secretInput = document.getElementById('import-secret');
       const batchInput = document.getElementById('batch-label');
       const syncShapeInput = document.getElementById('sync-shape');
