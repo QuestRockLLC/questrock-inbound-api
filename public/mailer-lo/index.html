@@ -168,8 +168,10 @@
             <input id="desk-secret" type="password" placeholder="MAILER_IMPORT_SECRET" />
           </div>
           <div>
-            <label for="lo-name">Your name (for assign + script)</label>
-            <input id="lo-name" type="text" placeholder="e.g. Nikk Smith" />
+            <label for="lo-name">Loan officer (assign + script)</label>
+            <select id="lo-name">
+              <option value="">Select your name…</option>
+            </select>
           </div>
         </div>
       </div>
@@ -391,19 +393,6 @@
         if (e.key === 'Enter') document.getElementById('search-btn').click();
       });
 
-      document.getElementById('assign-btn').addEventListener('click', async () => {
-        if (!selectedRef) return;
-        try {
-          await apiPost('/api/mailer-lo/assign', {
-            reference_code: selectedRef,
-            lo_name: loNameInput.value.trim() || 'LO',
-          });
-          await loadLead(selectedRef);
-        } catch (e) {
-          alert(e.message);
-        }
-      });
-
       document.querySelectorAll('.tabs button').forEach((btn) => {
         btn.addEventListener('click', async () => {
           document.querySelectorAll('.tabs button').forEach((b) => b.classList.remove('active'));
@@ -414,6 +403,62 @@
         });
       });
 
+      async function loadLoRoster() {
+        try {
+          const data = await apiGet('/api/mailer-lo/roster');
+          const select = document.getElementById('lo-name');
+          const current = savedLo || '';
+          select.innerHTML =
+            '<option value="">Select your name…</option>' +
+            (data.roster || [])
+              .map(
+                (lo) =>
+                  `<option value="${lo.name}"${lo.name === current ? ' selected' : ''}>${lo.name}</option>`,
+              )
+              .join('');
+        } catch {
+          const select = document.getElementById('lo-name');
+          select.innerHTML = `
+            <option value="">Select your name…</option>
+            <option value="Tashawna Chisholm">Tashawna Chisholm</option>
+            <option value="Stephen Curry">Stephen Curry</option>
+            <option value="Jessica Sherard">Jessica Sherard</option>
+            <option value="Tyler Johnson">Tyler Johnson</option>
+            <option value="Bastian Johnston">Bastian Johnston</option>
+            <option value="Nikk Smith">Nikk Smith</option>
+          `;
+          if (savedLo) select.value = savedLo;
+        }
+      }
+
+      document.getElementById('assign-btn').addEventListener('click', async () => {
+        if (!selectedRef) return;
+        const lo = loNameInput.value.trim();
+        if (!lo) {
+          alert('Select your name from the dropdown first.');
+          return;
+        }
+        try {
+          const result = await apiPost('/api/mailer-lo/assign', {
+            reference_code: selectedRef,
+            lo_name: lo,
+          });
+          if (result.shape_assignment?.synced) {
+            setStatus('Assigned in Supabase + Shape', 'ok');
+          } else if (result.shape_assignment?.reason) {
+            alert(`Supabase saved. Shape: ${result.shape_assignment.reason}`);
+          }
+          await loadLead(selectedRef);
+        } catch (e) {
+          alert(e.message);
+        }
+      });
+
+      loNameInput.addEventListener('change', () => {
+        sessionStorage.setItem('mailerLoName', loNameInput.value.trim());
+      });
+
+      loadLoRoster().catch(() => {});
       loadCampaign().catch(() => {});
     </script>
   </body>
