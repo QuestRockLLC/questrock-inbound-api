@@ -23,6 +23,9 @@
     },
     "api/import-mailer-list.js": {
       "maxDuration": 300
+    },
+    "api/chat.js": {
+      "maxDuration": 60
     }
   }
 }
