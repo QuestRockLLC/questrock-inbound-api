@@ -3,10 +3,20 @@ import { getSupabaseClient } from '../lib/supabase.js';
 import { importMailerRows, syncMailerRowsToShape } from '../lib/mailer/import.js';
 import { normalizeMailerRows } from '../lib/mailer/normalize.js';
 import { assertImportAuthorized, readJsonBody, sendJson } from '../lib/http.js';
+import {
+  handleShapeArchiveExport,
+  isShapeArchiveRequest,
+} from '../lib/shape/archive-export-handler.js';
 
 const ASYNC_SHAPE_ROW_THRESHOLD = 8;
 
 export default async function handler(req, res) {
+  const body = req.method === 'POST' ? readJsonBody(req) : null;
+
+  if (isShapeArchiveRequest(req, body)) {
+    return handleShapeArchiveExport(req, res);
+  }
+
   if (req.method === 'GET') {
     try {
       assertImportAuthorized(req, {
@@ -41,7 +51,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    const body = readJsonBody(req);
     assertImportAuthorized(req, body);
     const rawRows = Array.isArray(body.rows) ? body.rows : [];
     const batchLabel = String(body.batch_label || body.batchLabel || '').trim() ||

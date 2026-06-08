@@ -1,4 +1,13 @@
 {
+  "rewrites": [
+    { "source": "/api/zoom-call", "destination": "/api/call-answered" },
+    { "source": "/api/mailer-lo/search", "destination": "/api/mailer-lo?action=search" },
+    { "source": "/api/mailer-lo/lead", "destination": "/api/mailer-lo?action=lead" },
+    { "source": "/api/mailer-lo/assign", "destination": "/api/mailer-lo?action=assign" },
+    { "source": "/api/mailer-lo/roster", "destination": "/api/mailer-lo?action=roster" },
+    { "source": "/api/mailer-lo/campaign", "destination": "/api/mailer-lo?action=campaign" },
+    { "source": "/api/shape-archive/export", "destination": "/api/import-mailer-list?resource=shape-archive" }
+  ],
   "functions": {
     "api/zoom-transcript.js": {
       "maxDuration": 300
@@ -13,9 +22,6 @@
       "maxDuration": 60
     },
     "api/import-mailer-list.js": {
-      "maxDuration": 300
-    },
-    "api/shape-archive/export.js": {
       "maxDuration": 300
     }
   }
