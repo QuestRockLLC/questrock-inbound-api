@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QuestRock — Shape Lead Archive</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Playfair+Display:wght@600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #eef2f0;
+        --card: #fffdf8;
+        --ink: #1f2a24;
+        --muted: #5f6d66;
+        --accent: #2d6a4f;
+        --accent-soft: #d8f3dc;
+        --border: #d8ddd8;
+        --danger: #b42318;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: 'DM Sans', system-ui, sans-serif;
+        color: var(--ink);
+        background: var(--bg);
+        min-height: 100vh;
+      }
+      .wrap { max-width: 960px; margin: 0 auto; padding: 1.5rem; }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+      }
+      h1 {
+        font-family: 'Playfair Display', serif;
+        margin: 0 0 0.35rem;
+        font-size: 1.75rem;
+      }
+      .sub { margin: 0; color: var(--muted); line-height: 1.45; max-width: 42rem; }
+      .nav a { color: var(--accent); font-weight: 600; text-decoration: none; margin-left: 1rem; }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1rem 1.1rem;
+        margin-bottom: 1rem;
+      }
+      label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.3rem; }
+      input, textarea, button {
+        font: inherit;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+      }
+      input, textarea {
+        width: 100%;
+        padding: 0.6rem 0.75rem;
+        background: #fff;
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+      }
+      @media (max-width: 640px) {
+        .grid2 { grid-template-columns: 1fr; }
+      }
+      .password-wrap {
+        display: flex;
+        gap: 0.35rem;
+        align-items: stretch;
+      }
+      .password-wrap input { flex: 1; min-width: 0; }
+      .password-wrap .password-toggle {
+        flex-shrink: 0;
+        width: auto;
+        padding: 0.6rem 0.85rem;
+        font-size: 0.8rem;
+      }
+      .sources { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.35rem; }
+      .sources label { display: flex; align-items: center; gap: 0.45rem; font-weight: 500; }
+      button {
+        padding: 0.55rem 1rem;
+        border: 0;
+        font-weight: 600;
+        cursor: pointer;
+        background: var(--accent);
+        color: #fff;
+      }
+      button.secondary { background: #e8ebe9; color: var(--ink); }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+      .status {
+        display: inline-flex;
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        background: #e8ebe9;
+      }
+      .status.ok { background: var(--accent-soft); color: var(--accent); }
+      .status.err { background: #ffe5e5; color: var(--danger); }
+      pre {
+        background: #1f2a24;
+        color: #e8f5e9;
+        padding: 1rem;
+        border-radius: 10px;
+        overflow: auto;
+        font-size: 0.8rem;
+        line-height: 1.45;
+        max-height: 420px;
+      }
+      .progress {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.65rem;
+        margin-top: 0.75rem;
+      }
+      .stat {
+        background: #f5f5f4;
+        border-radius: 10px;
+        padding: 0.65rem 0.75rem;
+      }
+      .stat strong { display: block; font-size: 1.1rem; }
+      .stat span { font-size: 0.75rem; color: var(--muted); }
+      .hint { font-size: 0.85rem; color: var(--muted); margin-top: 0.75rem; line-height: 1.45; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div>
+          <h1>Shape Lead Archive</h1>
+          <p class="sub">
+            Bulk export Shape leads by created date, filter to <strong>Inbound Zoom Call</strong> and
+            <strong>Inbound Shape Phone</strong>, enrich with notes + Supabase transcripts. Stored for stalled-loan search and chatbot.
+          </p>
+        </div>
+        <div class="nav">
+          <span id="status-badge" class="status">Ready</span>
+          <a href="/mailer-import/">Import</a>
+          <a href="/mailer-lo/">LO Desk</a>
+        </div>
+      </header>
+
+      <section class="card">
+        <div class="grid2">
+          <div>
+            <label for="desk-secret">Admin password</label>
+            <div class="password-wrap">
+              <input id="desk-secret" type="password" placeholder="MAILER_IMPORT_SECRET" autocomplete="current-password" />
+              <button type="button" class="secondary password-toggle" data-target="desk-secret" aria-label="Show password">Show</button>
+            </div>
+          </div>
+          <div>
+            <label for="batch-label">Batch label</label>
+            <input id="batch-label" type="text" placeholder="Dec 2025 – Jun 2026 inbound archive" />
+          </div>
+          <div>
+            <label for="date-from">Created from</label>
+            <input id="date-from" type="date" value="2025-12-01" />
+          </div>
+          <div>
+            <label for="date-to">Created to</label>
+            <input id="date-to" type="date" value="2026-06-08" />
+          </div>
+        </div>
+
+        <label style="margin-top:0.75rem">Lead sources to keep</label>
+        <div class="sources">
+          <label><input type="checkbox" class="source-check" value="Inbound Zoom Call" checked /> Inbound Zoom Call</label>
+          <label><input type="checkbox" class="source-check" value="Inbound Shape Phone" checked /> Inbound Shape Phone</label>
+        </div>
+
+        <div class="actions">
+          <button id="start-btn" type="button">Start new archive</button>
+          <button id="bulk-btn" type="button" class="secondary" disabled>Continue bulk export</button>
+          <button id="enrich-btn" type="button" class="secondary" disabled>Continue notes enrich</button>
+          <button id="auto-btn" type="button" class="secondary" disabled>Auto-run until done</button>
+        </div>
+
+        <p class="hint">
+          Run migration <code>005_shape_archive.sql</code> in Supabase first. Bulk export is paginated (50/page) — click Continue or Auto-run.
+          Shape Phone leads are stored now; Zoom transcripts already in Supabase are merged during enrich.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2 style="margin:0 0 0.75rem;font-size:1.05rem">Progress</h2>
+        <div class="progress">
+          <div class="stat"><strong id="stat-status">—</strong><span>Status</span></div>
+          <div class="stat"><strong id="stat-matched">0</strong><span>Leads matched</span></div>
+          <div class="stat"><strong id="stat-seen">0</strong><span>Leads scanned</span></div>
+          <div class="stat"><strong id="stat-enrich">0</strong><span>Enriched</span></div>
+          <div class="stat"><strong id="stat-notes">0</strong><span>Notes stored</span></div>
+        </div>
+        <pre id="result">{}</pre>
+      </section>
+    </div>
+
+    <script>
+      document.querySelectorAll('.password-toggle').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const input = document.getElementById(btn.dataset.target);
+          const show = input.type === 'password';
+          input.type = show ? 'text' : 'password';
+          btn.textContent = show ? 'Hide' : 'Show';
+          btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        });
+      });
+
+      const secretInput = document.getElementById('desk-secret');
+      const statusBadge = document.getElementById('status-badge');
+      const resultEl = document.getElementById('result');
+      const startBtn = document.getElementById('start-btn');
+      const bulkBtn = document.getElementById('bulk-btn');
+      const enrichBtn = document.getElementById('enrich-btn');
+      const autoBtn = document.getElementById('auto-btn');
+
+      let currentBatchId = null;
+      let autoRunning = false;
+
+      const savedSecret = sessionStorage.getItem('mailerImportSecret');
+      if (savedSecret) secretInput.value = savedSecret;
+
+      function setStatus(text, kind) {
+        statusBadge.textContent = text;
+        statusBadge.className = 'status' + (kind ? ` ${kind}` : '');
+      }
+
+      function selectedSources() {
+        return [...document.querySelectorAll('.source-check:checked')].map((el) => el.value);
+      }
+
+      function authHeaders() {
+        const secret = secretInput.value.trim();
+        if (!secret) throw new Error('Enter admin password first.');
+        sessionStorage.setItem('mailerImportSecret', secret);
+        return {
+          'Content-Type': 'application/json',
+          'x-mailer-import-secret': secret,
+        };
+      }
+
+      function updateProgress(batch) {
+        if (!batch) return;
+        document.getElementById('stat-status').textContent = batch.status || '—';
+        document.getElementById('stat-matched').textContent = batch.bulk_leads_matched ?? batch.lead_count ?? 0;
+        document.getElementById('stat-seen').textContent = batch.bulk_leads_seen ?? 0;
+        document.getElementById('stat-enrich').textContent = batch.enrich_done ?? 0;
+        document.getElementById('stat-notes').textContent = batch.note_count ?? batch.notes_count ?? 0;
+      }
+
+      function setBatchActive(batchId, batch) {
+        currentBatchId = batchId;
+        bulkBtn.disabled = !batchId;
+        enrichBtn.disabled = !batchId;
+        autoBtn.disabled = !batchId;
+        updateProgress(batch);
+      }
+
+      async function apiPost(body) {
+        const response = await fetch('/api/shape-archive/export', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ import_secret: secretInput.value.trim(), ...body }),
+        });
+        const payload = await response.json();
+        resultEl.textContent = JSON.stringify(payload, null, 2);
+        if (!response.ok || payload.ok === false) {
+          throw new Error(payload.error || `Request failed (${response.status})`);
+        }
+        if (payload.batch) {
+          setBatchActive(payload.batch.batch_id, payload.batch);
+        }
+        return payload;
+      }
+
+      async function refreshBatch() {
+        if (!currentBatchId) return;
+        const secret = secretInput.value.trim();
+        const res = await fetch(
+          `/api/shape-archive/export?batch_id=${encodeURIComponent(currentBatchId)}&import_secret=${encodeURIComponent(secret)}`,
+          { headers: { 'x-mailer-import-secret': secret } },
+        );
+        const payload = await res.json();
+        if (payload.ok && payload.batch) {
+          updateProgress(payload.batch);
+        }
+      }
+
+      startBtn.addEventListener('click', async () => {
+        try {
+          setStatus('Starting…', '');
+          const payload = await apiPost({
+            action: 'start',
+            batch_label: document.getElementById('batch-label').value.trim(),
+            date_from: document.getElementById('date-from').value,
+            date_to: document.getElementById('date-to').value,
+            source_filters: selectedSources(),
+            auto_start: true,
+          });
+          setBatchActive(payload.batch.batch_id, payload.batch);
+          setStatus('Batch started', 'ok');
+        } catch (error) {
+          setStatus('Failed', 'err');
+          alert(error.message);
+        }
+      });
+
+      bulkBtn.addEventListener('click', async () => {
+        if (!currentBatchId) return;
+        try {
+          setStatus('Bulk export…', '');
+          const payload = await apiPost({ action: 'bulk', batch_id: currentBatchId });
+          setStatus(payload.has_more ? 'Bulk — more pages' : 'Bulk done', payload.has_more ? '' : 'ok');
+        } catch (error) {
+          setStatus('Bulk failed', 'err');
+          alert(error.message);
+        }
+      });
+
+      enrichBtn.addEventListener('click', async () => {
+        if (!currentBatchId) return;
+        try {
+          setStatus('Enriching notes…', '');
+          const payload = await apiPost({ action: 'enrich', batch_id: currentBatchId });
+          setStatus(payload.has_more ? 'Enrich — more leads' : 'Completed', payload.has_more ? '' : 'ok');
+        } catch (error) {
+          setStatus('Enrich failed', 'err');
+          alert(error.message);
+        }
+      });
+
+      autoBtn.addEventListener('click', async () => {
+        if (!currentBatchId || autoRunning) return;
+        autoRunning = true;
+        autoBtn.disabled = true;
+        try {
+          for (let step = 0; step < 500; step += 1) {
+            const secret = secretInput.value.trim();
+            const statusRes = await fetch(
+              `/api/shape-archive/export?batch_id=${encodeURIComponent(currentBatchId)}&import_secret=${encodeURIComponent(secret)}`,
+              { headers: { 'x-mailer-import-secret': secret } },
+            );
+            const statusPayload = await statusRes.json();
+            const batch = statusPayload.batch;
+            if (!batch) break;
+            updateProgress(batch);
+
+            if (batch.status === 'completed') {
+              setStatus('Archive complete', 'ok');
+              break;
+            }
+
+            if (batch.status !== 'bulk_done' && batch.status !== 'enrich_running') {
+              setStatus('Auto: bulk export…', '');
+              const bulkPayload = await apiPost({ action: 'bulk', batch_id: currentBatchId });
+              if (bulkPayload.has_more) continue;
+            }
+
+            if ((batch.pending_enrich ?? 0) > 0 || batch.status === 'bulk_done') {
+              setStatus('Auto: enriching notes…', '');
+              const enrichPayload = await apiPost({ action: 'enrich', batch_id: currentBatchId });
+              if (enrichPayload.has_more) continue;
+            }
+
+            setStatus('Archive complete', 'ok');
+            break;
+          }
+        } catch (error) {
+          setStatus('Auto-run failed', 'err');
+          alert(error.message);
+        } finally {
+          autoRunning = false;
+          autoBtn.disabled = !currentBatchId;
+        }
+      });
+    </script>
+  </body>
+</html>

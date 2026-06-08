@@ -14,6 +14,9 @@
     },
     "api/import-mailer-list.js": {
       "maxDuration": 300
+    },
+    "api/shape-archive/export.js": {
+      "maxDuration": 300
     }
   }
 }
