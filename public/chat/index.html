@@ -185,6 +185,8 @@
           <p class="sub">Ask about stalled inbound leads, statuses, notes, and next steps — powered by your Shape archive + OpenAI.</p>
         </div>
         <div class="nav">
+          <span id="user-label" class="sub" style="margin:0"></span>
+          <button type="button" id="sign-out-btn" style="padding:0.45rem 0.75rem;background:var(--card);border:1px solid var(--border);border-radius:10px;cursor:pointer">Sign out</button>
           <a href="/shape-archive/">Archive</a>
           <a href="/mailer-lo/">LO Desk</a>
           <a href="/mailer-import/">Import</a>
@@ -192,13 +194,6 @@
       </header>
 
       <div class="toolbar">
-        <div>
-          <label for="desk-secret">Password</label>
-          <div class="password-wrap">
-            <input id="desk-secret" type="password" placeholder="MAILER_IMPORT_SECRET" autocomplete="current-password" />
-            <button type="button" class="password-toggle" data-target="desk-secret" aria-label="Show password">Show</button>
-          </div>
-        </div>
         <button id="load-meta" type="button" style="padding:0.55rem 0.9rem;background:var(--card);color:var(--ink);cursor:pointer;border:1px solid var(--border);border-radius:10px">Load archive</button>
       </div>
 
@@ -213,7 +208,7 @@
 
       <div class="chat">
         <div class="messages" id="messages">
-          <div class="msg system">Enter password, load archive, then ask a question.</div>
+          <div class="msg system">Load archive, then ask a question.</div>
         </div>
         <div class="status" id="status"></div>
         <form class="composer" id="composer">
@@ -223,37 +218,15 @@
       </div>
     </div>
 
+    <script src="/inbound-auth.js"></script>
     <script>
-      document.querySelectorAll('.password-toggle').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const input = document.getElementById(btn.dataset.target);
-          const show = input.type === 'password';
-          input.type = show ? 'text' : 'password';
-          btn.textContent = show ? 'Hide' : 'Show';
-        });
-      });
-
-      const secretInput = document.getElementById('desk-secret');
       const messagesEl = document.getElementById('messages');
       const inputEl = document.getElementById('input');
       const statusEl = document.getElementById('status');
       const metaEl = document.getElementById('meta');
       const sendBtn = document.getElementById('send');
 
-      const savedSecret = sessionStorage.getItem('mailerImportSecret');
-      if (savedSecret) secretInput.value = savedSecret;
-
       let history = [];
-
-      function authHeaders() {
-        const secret = secretInput.value.trim();
-        if (!secret) throw new Error('Enter password first.');
-        sessionStorage.setItem('mailerImportSecret', secret);
-        return {
-          'Content-Type': 'application/json',
-          'x-mailer-import-secret': secret,
-        };
-      }
 
       function addMessage(role, content, sources) {
         const empty = messagesEl.querySelector('.msg.system');
@@ -277,10 +250,7 @@
       }
 
       async function loadMeta() {
-        const secret = secretInput.value.trim();
-        const res = await fetch(`/api/chat?import_secret=${encodeURIComponent(secret)}`, {
-          headers: { 'x-mailer-import-secret': secret },
-        });
+        const res = await fetch('/api/chat', { credentials: 'include' });
         const data = await res.json();
         if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to load archive meta');
 
@@ -329,12 +299,11 @@
         statusEl.textContent = 'Thinking…';
 
         try {
-          const secret = secretInput.value.trim();
           const res = await fetch('/api/chat', {
             method: 'POST',
-            headers: authHeaders(),
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              import_secret: secret,
               message: text,
               history,
             }),
@@ -356,7 +325,14 @@
         }
       });
 
-      if (savedSecret) loadMeta().catch(() => {});
+      document.getElementById('sign-out-btn').addEventListener('click', () => InboundAuth.signOut());
+
+      (async () => {
+        const user = await InboundAuth.requireAuth({ requireAdmin: true });
+        if (!user) return;
+        document.getElementById('user-label').textContent = user.name;
+        loadMeta().catch(() => {});
+      })();
     </script>
   </body>
 </html>

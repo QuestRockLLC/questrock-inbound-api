@@ -192,7 +192,9 @@
           <p class="sub">Search mailer leads · assign · history · call script · this week's mail</p>
         </div>
         <div class="nav" style="display:flex;align-items:center;gap:1rem">
-          <a href="/mailer-import/">Admin import</a>
+          <a id="admin-import-link" href="/mailer-import/" hidden>Admin import</a>
+          <span id="user-label" class="sub" style="margin:0"></span>
+          <button type="button" id="sign-out-btn" class="secondary" style="padding:0.45rem 0.75rem">Sign out</button>
           <span id="status-badge" class="status">Ready</span>
         </div>
       </header>
@@ -200,16 +202,13 @@
       <div class="card">
         <div class="grid2">
           <div>
-            <label for="desk-secret">Desk password</label>
-            <div class="password-wrap">
-              <input id="desk-secret" type="password" placeholder="MAILER_IMPORT_SECRET" autocomplete="current-password" />
-              <button type="button" class="secondary password-toggle" data-target="desk-secret" aria-label="Show password">Show</button>
-            </div>
+            <label>Signed in as</label>
+            <p id="lo-display" style="margin:0;font-weight:600;font-size:1.05rem"></p>
           </div>
           <div>
             <label for="lo-name">Loan officer (assign + script)</label>
-            <select id="lo-name">
-              <option value="">Select your name…</option>
+            <select id="lo-name" disabled>
+              <option value="">Loading…</option>
             </select>
           </div>
         </div>
@@ -218,12 +217,12 @@
       <div class="layout">
         <aside>
           <div class="card">
-            <label for="search-q">Search Supabase mailer leads</label>
+            <label for="search-q">Search your mailer leads</label>
             <div class="search-row">
               <input id="search-q" type="text" placeholder="Name, offer code, address, phone…" />
               <button id="search-btn" type="button">Search</button>
             </div>
-            <p style="font-size:0.8rem;color:var(--muted);margin:0.5rem 0 0">Try NIKK00001, Nikk Test, or a street name</p>
+            <p style="font-size:0.8rem;color:var(--muted);margin:0.5rem 0 0">Your assigned leads and unassigned pool load automatically.</p>
           </div>
           <div class="card results" id="results"></div>
         </aside>
@@ -276,20 +275,11 @@
       </div>
     </div>
 
+    <script src="/inbound-auth.js"></script>
     <script>
-      document.querySelectorAll('.password-toggle').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const input = document.getElementById(btn.dataset.target);
-          const show = input.type === 'password';
-          input.type = show ? 'text' : 'password';
-          btn.textContent = show ? 'Hide' : 'Show';
-          btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-        });
-      });
-
       const statusBadge = document.getElementById('status-badge');
-      const secretInput = document.getElementById('desk-secret');
       const loNameInput = document.getElementById('lo-name');
+      let currentUser = null;
 
       function setStatus(text, kind) {
         statusBadge.textContent = text;
@@ -303,44 +293,8 @@
       let selectedRef = null;
       let campaignCache = null;
 
-      const savedSecret = sessionStorage.getItem('mailerImportSecret');
-      const savedLo = sessionStorage.getItem('mailerLoName');
-      if (savedSecret) secretInput.value = savedSecret;
-      if (savedLo) loNameInput.value = savedLo;
-
-      function authQuery() {
-        const secret = secretInput.value.trim();
-        if (!secret) throw new Error('Enter desk password first.');
-        sessionStorage.setItem('mailerImportSecret', secret);
-        sessionStorage.setItem('mailerLoName', loNameInput.value.trim());
-        return secret;
-      }
-
-      async function apiGet(path) {
-        const secret = authQuery();
-        const sep = path.includes('?') ? '&' : '?';
-        const res = await fetch(`${path}${sep}import_secret=${encodeURIComponent(secret)}`, {
-          headers: { 'x-mailer-import-secret': secret },
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) throw new Error(data.error || `Request failed (${res.status})`);
-        return data;
-      }
-
-      async function apiPost(path, body) {
-        const secret = authQuery();
-        const res = await fetch(path, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-mailer-import-secret': secret,
-          },
-          body: JSON.stringify({ import_secret: secret, ...body }),
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) throw new Error(data.error || `Request failed (${res.status})`);
-        return data;
-      }
+      const apiGet = (path) => InboundAuth.apiGet(path);
+      const apiPost = (path, body) => InboundAuth.apiPost(path, body);
 
       function renderResults(rows) {
         if (!rows.length) {
@@ -459,31 +413,48 @@
         });
       });
 
-      async function loadLoRoster() {
+      function setLoName(loName, isAdmin) {
+        const select = document.getElementById('lo-name');
+        if (isAdmin) {
+          select.disabled = false;
+          return loadLoRoster(loName);
+        }
+        if (!loName) {
+          select.innerHTML = '<option value="">Not on LO roster</option>';
+          select.disabled = true;
+          return;
+        }
+        select.innerHTML = `<option value="${loName}" selected>${loName}</option>`;
+        select.disabled = true;
+        document.getElementById('lo-display').textContent = loName;
+      }
+
+      async function loadLoRoster(selectedName) {
         try {
           const data = await apiGet('/api/mailer-lo/roster');
           const select = document.getElementById('lo-name');
-          const current = savedLo || '';
+          const current = selectedName || '';
           select.innerHTML =
-            '<option value="">Select your name…</option>' +
+            '<option value="">Select LO…</option>' +
             (data.roster || [])
               .map(
                 (lo) =>
                   `<option value="${lo.name}"${lo.name === current ? ' selected' : ''}>${lo.name}</option>`,
               )
               .join('');
+          select.disabled = false;
         } catch {
-          const select = document.getElementById('lo-name');
-          select.innerHTML = `
-            <option value="">Select your name…</option>
-            <option value="Tashawna Chisholm">Tashawna Chisholm</option>
-            <option value="Stephen Curry">Stephen Curry</option>
-            <option value="Jessica Sherard">Jessica Sherard</option>
-            <option value="Tyler Johnson">Tyler Johnson</option>
-            <option value="Bastian Johnston">Bastian Johnston</option>
-            <option value="Nikk Smith">Nikk Smith</option>
-          `;
-          if (savedLo) select.value = savedLo;
+          /* roster optional for admins */
+        }
+      }
+
+      async function loadMyLeads() {
+        try {
+          const data = await apiGet('/api/mailer-lo/my-leads');
+          renderResults(data.results || []);
+          setStatus(`${data.count || 0} leads`, 'ok');
+        } catch (e) {
+          resultsEl.innerHTML = `<p class="empty" style="color:#9b2226">${e.message}</p>`;
         }
       }
 
@@ -491,24 +462,15 @@
         if (!selectedRef) return;
         const lo = loNameInput.value.trim();
         if (!lo) {
-          alert('Select your name from the dropdown first.');
+          alert('Your LO name is not set on this account.');
           return;
         }
         const assignResultEl = document.getElementById('assign-result');
         try {
-          const response = await fetch('/api/mailer-lo/assign', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-mailer-import-secret': authQuery(),
-            },
-            body: JSON.stringify({
-              import_secret: secretInput.value.trim(),
-              reference_code: selectedRef,
-              lo_name: lo,
-            }),
+          const result = await apiPost('/api/mailer-lo/assign', {
+            reference_code: selectedRef,
+            lo_name: lo,
           });
-          const result = await response.json();
           assignResultEl.style.display = 'block';
           assignResultEl.textContent = JSON.stringify(result, null, 2);
 
@@ -530,12 +492,34 @@
         }
       });
 
-      loNameInput.addEventListener('change', () => {
-        sessionStorage.setItem('mailerLoName', loNameInput.value.trim());
-      });
+      document.getElementById('sign-out-btn').addEventListener('click', () => InboundAuth.signOut());
 
-      loadLoRoster().catch(() => {});
-      loadCampaign().catch(() => {});
+      (async () => {
+        currentUser = await InboundAuth.requireAuth();
+        if (!currentUser) return;
+
+        document.getElementById('user-label').textContent = currentUser.name;
+        if (currentUser.isAdmin) {
+          document.getElementById('admin-import-link').hidden = false;
+        }
+
+        setLoName(currentUser.loName, currentUser.isAdmin);
+        if (!currentUser.isAdmin && !currentUser.loName) {
+          setStatus('Not on LO roster', 'err');
+          resultsEl.innerHTML =
+            '<p class="empty">Your QuestRock account is not mapped to a mailer LO. Contact an admin.</p>';
+          return;
+        }
+
+        if (!currentUser.isAdmin) {
+          document.getElementById('lo-display').textContent = currentUser.loName;
+        } else {
+          document.getElementById('lo-display').textContent = `${currentUser.name} (admin)`;
+        }
+
+        await loadMyLeads();
+        loadCampaign().catch(() => {});
+      })();
     </script>
   </body>
 </html>

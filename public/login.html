@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sign in — QuestRock Inbound</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Playfair+Display:wght@600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #eef2f0;
+        --card: #fffdf8;
+        --ink: #1f2a24;
+        --muted: #5f6d66;
+        --accent: #2d6a4f;
+        --border: #d8ddd8;
+        --danger: #b42318;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: 'DM Sans', system-ui, sans-serif;
+        color: var(--ink);
+        background: var(--bg);
+        display: grid;
+        place-items: center;
+        padding: 1.25rem;
+      }
+      .card {
+        width: 100%;
+        max-width: 420px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.5rem;
+      }
+      h1 {
+        font-family: 'Playfair Display', Georgia, serif;
+        margin: 0 0 0.35rem;
+        font-size: 1.75rem;
+      }
+      .sub { color: var(--muted); margin: 0 0 1.25rem; line-height: 1.5; }
+      label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 0.35rem; }
+      input {
+        width: 100%;
+        font: inherit;
+        padding: 0.65rem 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        margin-bottom: 0.85rem;
+      }
+      button {
+        width: 100%;
+        font: inherit;
+        font-weight: 600;
+        padding: 0.7rem 1rem;
+        border: none;
+        border-radius: 10px;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+      }
+      button:disabled { opacity: 0.65; cursor: wait; }
+      .error {
+        color: var(--danger);
+        font-size: 0.9rem;
+        margin-top: 0.75rem;
+      }
+    </style>
+  </head>
+  <body>
+    <section class="card">
+      <h1>QuestRock Inbound</h1>
+      <p class="sub">Sign in with your QuestRock email and password. LOs go to the calling desk; admins can open mailer import.</p>
+      <form id="login-form">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="username" required />
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required />
+        <button type="submit" id="submit-btn">Continue</button>
+      </form>
+      <p id="login-error" class="error" hidden></p>
+    </section>
+
+    <script src="/inbound-auth.js"></script>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const nextPath = params.get('next');
+      const presetError = params.get('error');
+
+      if (presetError) {
+        const err = document.getElementById('login-error');
+        err.textContent =
+          presetError === 'auth'
+            ? 'Central Hub sign-in expired. Sign in again.'
+            : presetError === 'not_configured'
+              ? 'Auth is not configured on this deployment.'
+              : 'Sign-in failed. Try again.';
+        err.hidden = false;
+      }
+
+      InboundAuth.me().then((user) => {
+        if (!user) return;
+        if (nextPath && nextPath.startsWith('/') && !nextPath.startsWith('//')) {
+          location.href = nextPath;
+        } else {
+          location.href = user.redirectTo || '/mailer-lo/';
+        }
+      });
+
+      document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const err = document.getElementById('login-error');
+        const btn = document.getElementById('submit-btn');
+        err.hidden = true;
+        btn.disabled = true;
+        try {
+          const res = await fetch('/api/login', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: document.getElementById('email').value.trim(),
+              password: document.getElementById('password').value,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            err.textContent = data.error || 'Sign-in failed.';
+            err.hidden = false;
+            return;
+          }
+          if (nextPath && nextPath.startsWith('/') && !nextPath.startsWith('//')) {
+            location.href = nextPath;
+          } else {
+            location.href = data.redirectTo || '/mailer-lo/';
+          }
+        } catch {
+          err.textContent = 'Network error — try again.';
+          err.hidden = false;
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

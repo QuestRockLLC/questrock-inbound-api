@@ -141,6 +141,8 @@
           </p>
         </div>
         <div class="nav">
+          <span id="user-label" class="sub" style="margin:0"></span>
+          <button type="button" id="sign-out-btn" class="secondary" style="padding:0.45rem 0.75rem">Sign out</button>
           <span id="status-badge" class="status">Ready</span>
           <a href="/mailer-import/">Import</a>
           <a href="/chat/">Pipeline Chat</a>
@@ -149,13 +151,6 @@
 
       <section class="card">
         <div class="grid2">
-          <div>
-            <label for="desk-secret">Admin password</label>
-            <div class="password-wrap">
-              <input id="desk-secret" type="password" placeholder="MAILER_IMPORT_SECRET" autocomplete="current-password" />
-              <button type="button" class="secondary password-toggle" data-target="desk-secret" aria-label="Show password">Show</button>
-            </div>
-          </div>
           <div>
             <label for="batch-label">Batch label</label>
             <input id="batch-label" type="text" placeholder="Dec 2025 – Jun 2026 inbound archive" />
@@ -202,18 +197,8 @@
       </section>
     </div>
 
+    <script src="/inbound-auth.js"></script>
     <script>
-      document.querySelectorAll('.password-toggle').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const input = document.getElementById(btn.dataset.target);
-          const show = input.type === 'password';
-          input.type = show ? 'text' : 'password';
-          btn.textContent = show ? 'Hide' : 'Show';
-          btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-        });
-      });
-
-      const secretInput = document.getElementById('desk-secret');
       const statusBadge = document.getElementById('status-badge');
       const resultEl = document.getElementById('result');
       const startBtn = document.getElementById('start-btn');
@@ -224,9 +209,6 @@
       let currentBatchId = null;
       let autoRunning = false;
 
-      const savedSecret = sessionStorage.getItem('mailerImportSecret');
-      if (savedSecret) secretInput.value = savedSecret;
-
       function setStatus(text, kind) {
         statusBadge.textContent = text;
         statusBadge.className = 'status' + (kind ? ` ${kind}` : '');
@@ -234,16 +216,6 @@
 
       function selectedSources() {
         return [...document.querySelectorAll('.source-check:checked')].map((el) => el.value);
-      }
-
-      function authHeaders() {
-        const secret = secretInput.value.trim();
-        if (!secret) throw new Error('Enter admin password first.');
-        sessionStorage.setItem('mailerImportSecret', secret);
-        return {
-          'Content-Type': 'application/json',
-          'x-mailer-import-secret': secret,
-        };
       }
 
       function updateProgress(batch) {
@@ -266,8 +238,9 @@
       async function apiPost(body) {
         const response = await fetch('/api/shape-archive/export', {
           method: 'POST',
-          headers: authHeaders(),
-          body: JSON.stringify({ import_secret: secretInput.value.trim(), ...body }),
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
         });
         const payload = await response.json();
         resultEl.textContent = JSON.stringify(payload, null, 2);
@@ -282,10 +255,9 @@
 
       async function refreshBatch() {
         if (!currentBatchId) return;
-        const secret = secretInput.value.trim();
         const res = await fetch(
-          `/api/shape-archive/export?batch_id=${encodeURIComponent(currentBatchId)}&import_secret=${encodeURIComponent(secret)}`,
-          { headers: { 'x-mailer-import-secret': secret } },
+          `/api/shape-archive/export?batch_id=${encodeURIComponent(currentBatchId)}`,
+          { credentials: 'include' },
         );
         const payload = await res.json();
         if (payload.ok && payload.batch) {
@@ -342,10 +314,9 @@
         autoBtn.disabled = true;
         try {
           for (let step = 0; step < 500; step += 1) {
-            const secret = secretInput.value.trim();
             const statusRes = await fetch(
-              `/api/shape-archive/export?batch_id=${encodeURIComponent(currentBatchId)}&import_secret=${encodeURIComponent(secret)}`,
-              { headers: { 'x-mailer-import-secret': secret } },
+              `/api/shape-archive/export?batch_id=${encodeURIComponent(currentBatchId)}`,
+              { credentials: 'include' },
             );
             const statusPayload = await statusRes.json();
             const batch = statusPayload.batch;
@@ -380,6 +351,14 @@
           autoBtn.disabled = !currentBatchId;
         }
       });
+
+      document.getElementById('sign-out-btn').addEventListener('click', () => InboundAuth.signOut());
+
+      (async () => {
+        const user = await InboundAuth.requireAuth({ requireAdmin: true });
+        if (!user) return;
+        document.getElementById('user-label').textContent = user.name;
+      })();
     </script>
   </body>
 </html>

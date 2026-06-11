@@ -240,19 +240,14 @@
         <div style="display:flex;align-items:center;gap:1rem">
           <a href="/mailer-lo/" style="color:var(--accent);font-weight:600;text-decoration:none">LO Desk</a>
           <a href="/shape-archive/" style="color:var(--accent);font-weight:600;text-decoration:none">Shape Archive</a>
+          <span id="user-label" class="subtitle" style="margin:0"></span>
+          <button type="button" id="sign-out-btn" class="secondary" style="padding:0.45rem 0.75rem">Sign out</button>
           <span id="status-badge" class="status">Ready</span>
         </div>
       </header>
 
       <section class="card">
         <div class="grid">
-          <div>
-            <label for="import-secret">Import password</label>
-            <div class="password-wrap">
-              <input id="import-secret" type="password" placeholder="Same as MAILER_IMPORT_SECRET in Vercel" autocomplete="current-password" />
-              <button type="button" class="secondary password-toggle" data-target="import-secret" aria-label="Show password">Show</button>
-            </div>
-          </div>
           <div>
             <label for="batch-label">Batch label</label>
             <input id="batch-label" type="text" placeholder="2026-05-15 Thursday drop" />
@@ -268,7 +263,7 @@
         <label>Spreadsheet file (.csv or .xlsx)</label>
         <div id="dropzone" class="dropzone" tabindex="0">
           <p><strong>Drop file here</strong> or click to browse</p>
-          <p class="hint">Expected columns: Full Name, Address, Offer Code, MTGAMT, LENDER, Mail Date, Expir, …<br />Table above is local only. <strong>Test API</strong> or <strong>Import</strong> hits the server (needs Vercel <code>MAILER_IMPORT_SECRET</code>).</p>
+          <p class="hint">Expected columns: Full Name, Address, Offer Code, MTGAMT, LENDER, Mail Date, Expir, …<br />Table above is local only. <strong>Test API</strong> or <strong>Import</strong> hits the server (admin sign-in required).</p>
         </div>
         <input id="file-input" type="file" accept=".csv,.xlsx,.xls" hidden />
         <div class="actions">
@@ -308,18 +303,8 @@
       </section>
     </div>
 
+    <script src="/inbound-auth.js"></script>
     <script>
-      document.querySelectorAll('.password-toggle').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const input = document.getElementById(btn.dataset.target);
-          const show = input.type === 'password';
-          input.type = show ? 'text' : 'password';
-          btn.textContent = show ? 'Hide' : 'Show';
-          btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-        });
-      });
-
-      const secretInput = document.getElementById('import-secret');
       const batchInput = document.getElementById('batch-label');
       const syncShapeInput = document.getElementById('sync-shape');
       const dropzone = document.getElementById('dropzone');
@@ -332,11 +317,6 @@
       const fileMeta = document.getElementById('file-meta');
 
       let parsedRows = [];
-
-      const savedSecret = sessionStorage.getItem('mailerImportSecret');
-      if (savedSecret) {
-        secretInput.value = savedSecret;
-      }
 
       if (!batchInput.value) {
         batchInput.value = new Date().toISOString().slice(0, 10);
@@ -437,21 +417,13 @@
         deferShape = false,
         shapeSyncOnly = false,
       }) {
-        const secret = secretInput.value.trim();
-        if (!secret) {
-          throw new Error('Enter the import password first.');
-        }
-
-        sessionStorage.setItem('mailerImportSecret', secret);
-
         const response = await fetch('/api/import-mailer-list', {
           method: 'POST',
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
-            'x-mailer-import-secret': secret,
           },
           body: JSON.stringify({
-            import_secret: secret,
             batch_label: batchInput.value.trim(),
             sync_shape: syncShapeInput.checked && !deferShape && !shapeSyncOnly,
             defer_shape: deferShape,
@@ -470,15 +442,6 @@
         }
 
         if ((!response.ok && response.status !== 202) || !payload.ok) {
-          if (response.status === 401) {
-            const hint = payload.auth_hint
-              ? ` [configured=${payload.auth_hint.mailer_secret_configured}, sent=${payload.auth_hint.secret_provided}, via=${payload.auth_hint.provided_via}]`
-              : '';
-            throw new Error(
-              (payload.error ||
-                '401 Unauthorized — MAILER_IMPORT_SECRET in Vercel must match the password on this page. Redeploy after saving the env var.') + hint,
-            );
-          }
           throw new Error(payload.error || `Import failed (${response.status})`);
         }
 
@@ -625,6 +588,14 @@
           previewBtn.disabled = !parsedRows.length;
         }
       });
+
+      document.getElementById('sign-out-btn').addEventListener('click', () => InboundAuth.signOut());
+
+      (async () => {
+        const user = await InboundAuth.requireAuth({ requireAdmin: true });
+        if (!user) return;
+        document.getElementById('user-label').textContent = user.name;
+      })();
     </script>
   </body>
 </html>

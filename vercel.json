@@ -1,6 +1,7 @@
 {
   "rewrites": [
     { "source": "/api/zoom-call", "destination": "/api/call-answered" },
+    { "source": "/api/mailer-lo/my-leads", "destination": "/api/mailer-lo?action=my-leads" },
     { "source": "/api/mailer-lo/search", "destination": "/api/mailer-lo?action=search" },
     { "source": "/api/mailer-lo/lead", "destination": "/api/mailer-lo?action=lead" },
     { "source": "/api/mailer-lo/assign", "destination": "/api/mailer-lo?action=assign" },

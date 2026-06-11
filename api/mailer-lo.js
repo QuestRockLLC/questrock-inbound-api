@@ -1,6 +1,10 @@
 import { getSupabaseClient } from '../lib/supabase.js';
-import { assertLoDeskAuthorized } from '../lib/mailer-lo/auth.js';
-import { searchMailerLeads } from '../lib/mailer-lo/search.js';
+import { assertLoDeskAuthorized, assertLoDeskOrAdmin } from '../lib/mailer-lo/auth.js';
+import {
+  searchMailerLeads,
+  listMailerLeadsForLo,
+  listRecentMailerLeads,
+} from '../lib/mailer-lo/search.js';
 import {
   buildLeadBrief,
   buildLeadScript,
@@ -9,6 +13,7 @@ import {
 import { assignMailerLeadToLo } from '../lib/mailer-lo/assign.js';
 import { getActiveMailerCampaign } from '../lib/mailer-lo/campaigns.js';
 import { getShapeLoRoster } from '../lib/shape/lo-roster.js';
+import { canAccessLead } from '../lib/inbound-access.js';
 import { readJsonBody, sendJson } from '../lib/http.js';
 
 function resolveAction(req) {
@@ -26,8 +31,43 @@ function resolveAction(req) {
   return '';
 }
 
+function loFilterForSession(session) {
+  return session.isAdmin ? null : session.loName || null;
+}
+
 export default async function handler(req, res) {
   const action = resolveAction(req);
+
+  if (action === 'my-leads') {
+    if (req.method !== 'GET') {
+      res.setHeader('Allow', 'GET');
+      return sendJson(res, 405, { ok: false, error: 'Method not allowed.' });
+    }
+
+    try {
+      const session = assertLoDeskAuthorized(req);
+      const loName = session.loName;
+      if (!loName && !session.isAdmin) {
+        return sendJson(res, 403, { ok: false, error: 'Your account is not on the mailer LO roster.' });
+      }
+
+      const results = session.isAdmin
+        ? await listRecentMailerLeads(getSupabaseClient(), { limit: 50 })
+        : await listMailerLeadsForLo(getSupabaseClient(), loName, { limit: 50 });
+
+      return sendJson(res, 200, {
+        ok: true,
+        loName: loName || null,
+        count: results.length,
+        results,
+      });
+    } catch (error) {
+      return sendJson(res, error.statusCode || 500, {
+        ok: false,
+        error: error.message || 'Failed to load leads.',
+      });
+    }
+  }
 
   if (action === 'search') {
     if (req.method !== 'GET') {
@@ -36,19 +76,16 @@ export default async function handler(req, res) {
     }
 
     try {
-      assertLoDeskAuthorized(req, {
-        import_secret: req.query?.import_secret ?? req.query?.importSecret,
-      });
-
+      const session = assertLoDeskAuthorized(req);
       const q = String(req.query?.q ?? '').trim();
-      const results = await searchMailerLeads(getSupabaseClient(), q);
+      const loName = loFilterForSession(session);
+      const results = await searchMailerLeads(getSupabaseClient(), q, { loName });
 
       return sendJson(res, 200, { ok: true, query: q, count: results.length, results });
     } catch (error) {
       return sendJson(res, error.statusCode || 500, {
         ok: false,
         error: error.message || 'Search failed.',
-        auth_hint: error.authHint,
       });
     }
   }
@@ -60,13 +97,11 @@ export default async function handler(req, res) {
     }
 
     try {
-      assertLoDeskAuthorized(req, {
-        import_secret: req.query?.import_secret ?? req.query?.importSecret,
-      });
+      const session = assertLoDeskAuthorized(req);
 
       const referenceCode = req.query?.reference_code ?? req.query?.referenceCode;
       const mailerLeadId = req.query?.mailer_lead_id ?? req.query?.mailerLeadId;
-      const loName = req.query?.lo_name ?? req.query?.loName ?? '';
+      const loName = req.query?.lo_name ?? req.query?.loName ?? session.loName ?? '';
 
       if (!referenceCode && !mailerLeadId) {
         return sendJson(res, 400, {
@@ -84,6 +119,10 @@ export default async function handler(req, res) {
         return sendJson(res, 404, { ok: false, error: 'Lead not found.' });
       }
 
+      if (!canAccessLead(session, detail.mailer_lead)) {
+        return sendJson(res, 403, { ok: false, error: 'This lead is assigned to another LO.' });
+      }
+
       return sendJson(res, 200, {
         ok: true,
         ...detail,
@@ -94,7 +133,6 @@ export default async function handler(req, res) {
       return sendJson(res, error.statusCode || 500, {
         ok: false,
         error: error.message || 'Failed to load lead.',
-        auth_hint: error.authHint,
       });
     }
   }
@@ -106,13 +144,22 @@ export default async function handler(req, res) {
     }
 
     try {
+      const session = assertLoDeskAuthorized(req);
       const body = readJsonBody(req);
-      assertLoDeskAuthorized(req, body);
+      const loName = String(body.lo_name ?? body.loName ?? session.loName ?? '').trim();
+
+      if (!loName) {
+        return sendJson(res, 400, { ok: false, error: 'LO name is required.' });
+      }
+
+      if (!session.isAdmin && session.loName && loName !== session.loName) {
+        return sendJson(res, 403, { ok: false, error: 'You can only assign leads to yourself.' });
+      }
 
       const result = await assignMailerLeadToLo(getSupabaseClient(), {
         referenceCode: body.reference_code ?? body.referenceCode,
         mailerLeadId: body.mailer_lead_id ?? body.mailerLeadId,
-        loName: body.lo_name ?? body.loName,
+        loName,
         note: body.note,
       });
 
@@ -122,7 +169,6 @@ export default async function handler(req, res) {
       return sendJson(res, error.statusCode || 500, {
         ok: false,
         error: error.message || 'Assign failed.',
-        auth_hint: error.authHint,
       });
     }
   }
@@ -134,10 +180,7 @@ export default async function handler(req, res) {
     }
 
     try {
-      assertLoDeskAuthorized(req, {
-        import_secret: req.query?.import_secret ?? req.query?.importSecret,
-      });
-
+      assertLoDeskOrAdmin(req);
       return sendJson(res, 200, {
         ok: true,
         roster: getShapeLoRoster(),
@@ -146,7 +189,6 @@ export default async function handler(req, res) {
       return sendJson(res, error.statusCode || 500, {
         ok: false,
         error: error.message || 'Failed to load LO roster.',
-        auth_hint: error.authHint,
       });
     }
   }
@@ -158,24 +200,19 @@ export default async function handler(req, res) {
     }
 
     try {
-      assertLoDeskAuthorized(req, {
-        import_secret: req.query?.import_secret ?? req.query?.importSecret,
-      });
-
+      assertLoDeskAuthorized(req);
       const campaign = await getActiveMailerCampaign(getSupabaseClient());
-
       return sendJson(res, 200, { ok: true, campaign });
     } catch (error) {
       return sendJson(res, error.statusCode || 500, {
         ok: false,
         error: error.message || 'Failed to load campaign.',
-        auth_hint: error.authHint,
       });
     }
   }
 
   return sendJson(res, 404, {
     ok: false,
-    error: 'Unknown mailer-lo action. Use search, lead, assign, roster, or campaign.',
+    error: 'Unknown mailer-lo action. Use my-leads, search, lead, assign, roster, or campaign.',
   });
 }

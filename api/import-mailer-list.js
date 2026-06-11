@@ -2,7 +2,8 @@ import { waitUntil } from '@vercel/functions';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { importMailerRows, syncMailerRowsToShape } from '../lib/mailer/import.js';
 import { normalizeMailerRows } from '../lib/mailer/normalize.js';
-import { assertImportAuthorized, readJsonBody, sendJson } from '../lib/http.js';
+import { assertInboundSession } from '../lib/request-auth.js';
+import { readJsonBody, sendJson } from '../lib/http.js';
 import {
   handleShapeArchiveExport,
   isShapeArchiveRequest,
@@ -19,9 +20,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      assertImportAuthorized(req, {
-        import_secret: req.query?.import_secret ?? req.query?.importSecret,
-      });
+      assertInboundSession(req, { requireAdmin: true });
       const supabase = getSupabaseClient();
       const limit = Math.min(Number(req.query?.limit) || 10, 50);
 
@@ -51,7 +50,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    assertImportAuthorized(req, body);
+    assertInboundSession(req, { requireAdmin: true });
     const rawRows = Array.isArray(body.rows) ? body.rows : [];
     const batchLabel = String(body.batch_label || body.batchLabel || '').trim() ||
       new Date().toISOString().slice(0, 10);
@@ -172,15 +171,6 @@ export default async function handler(req, res) {
     return sendJson(res, status, {
       ok: false,
       error: error.message || 'Mailer import failed.',
-      auth_hint:
-        error.authHint ??
-        (status === 401
-          ? {
-              mailer_secret_configured: Boolean(
-                String(process.env.MAILER_IMPORT_SECRET ?? '').trim(),
-              ),
-            }
-          : undefined),
     });
   }
 }

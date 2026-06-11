@@ -1,13 +1,12 @@
 import { getSupabaseClient } from '../lib/supabase.js';
 import { answerArchiveChat, getArchiveChatMeta } from '../lib/shape/archive-chat.js';
-import { assertImportAuthorized, readJsonBody, sendJson } from '../lib/http.js';
+import { assertInboundSession } from '../lib/request-auth.js';
+import { readJsonBody, sendJson } from '../lib/http.js';
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     try {
-      assertImportAuthorized(req, {
-        import_secret: req.query?.import_secret ?? req.query?.importSecret,
-      });
+      assertInboundSession(req, { requireAdmin: true });
 
       const meta = await getArchiveChatMeta(getSupabaseClient(), {
         batchId: req.query?.batch_id ?? req.query?.batchId,
@@ -30,7 +29,7 @@ export default async function handler(req, res) {
 
   try {
     const body = readJsonBody(req);
-    assertImportAuthorized(req, body);
+    assertInboundSession(req, { requireAdmin: true });
 
     const result = await answerArchiveChat(getSupabaseClient(), {
       message: body.message ?? body.query,
