@@ -24,8 +24,13 @@ export default async function handler(req, res) {
   }
 
   const user = await fetchHubUserFromToken(accessToken);
+  if (user.error === 'misconfigured') {
+    res.redirect(302, '/login.html?error=misconfigured');
+    return;
+  }
+
   if (user.error) {
-    res.redirect(302, `/login.html?error=${encodeURIComponent(user.error)}`);
+    res.redirect(302, '/login.html?error=auth');
     return;
   }
 

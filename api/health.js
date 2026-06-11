@@ -22,6 +22,9 @@ export default async function handler(req, res) {
   const checks = {
     supabase_url: Boolean(process.env.SUPABASE_URL),
     supabase_service_role: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    auth_session_secret: Boolean(process.env.AUTH_SESSION_SECRET),
+    hub_supabase_url: Boolean(process.env.HUB_SUPABASE_URL),
+    hub_supabase_anon_key: Boolean(process.env.HUB_SUPABASE_ANON_KEY),
     openai_api_key: Boolean(process.env.OPENAI_API_KEY),
     supabase_project_host: supabaseProjectHost(),
   };

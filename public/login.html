@@ -99,7 +99,9 @@
           presetError === 'auth'
             ? 'Central Hub sign-in expired. Sign in again.'
             : presetError === 'not_configured'
-              ? 'Auth is not configured on this deployment.'
+              ? 'AUTH_SESSION_SECRET is missing on Vercel for questrock-inbound-api. Add it under Settings → Environment Variables, then redeploy.'
+              : presetError === 'misconfigured'
+              ? 'HUB_SUPABASE_URL and HUB_SUPABASE_ANON_KEY must be set to the QR Dashboard Supabase project (same as Central Hub), not the inbound data project.'
               : 'Sign-in failed. Try again.';
         err.hidden = false;
       }
