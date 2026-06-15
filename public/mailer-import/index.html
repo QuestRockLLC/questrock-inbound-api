@@ -252,6 +252,14 @@
             <label for="batch-label">Batch label</label>
             <input id="batch-label" type="text" placeholder="2026-05-15 Thursday drop" />
           </div>
+          <div>
+            <label for="batch-id">Batch ID (for Shape sync)</label>
+            <input
+              id="batch-id"
+              type="text"
+              placeholder="Paste batch_id from import — or use ?batch_id= in URL"
+            />
+          </div>
         </div>
         <label class="checkbox-row">
           <input id="sync-shape" type="checkbox" checked />
@@ -309,6 +317,7 @@
     <script src="/inbound-auth.js"></script>
     <script>
       const batchInput = document.getElementById('batch-label');
+      const batchIdInput = document.getElementById('batch-id');
       const syncShapeInput = document.getElementById('sync-shape');
       const dropzone = document.getElementById('dropzone');
       const fileInput = document.getElementById('file-input');
@@ -325,25 +334,51 @@
       let parsedRows = [];
       let lastBatchId = localStorage.getItem('mailer_last_batch_id') || null;
 
+      function getActiveBatchId() {
+        const fromInput = batchIdInput.value.trim();
+        return fromInput || lastBatchId || null;
+      }
+
+      function setActiveBatchId(batchId) {
+        if (!batchId) return;
+        lastBatchId = batchId;
+        batchIdInput.value = batchId;
+        localStorage.setItem('mailer_last_batch_id', batchId);
+        updateBatchMeta();
+      }
+
       function updateBatchMeta() {
-        if (!lastBatchId) {
-          batchMeta.textContent = '';
+        const batchId = getActiveBatchId();
+        if (!batchId) {
+          batchMeta.textContent =
+            'After import, batch ID appears here — or paste it above to enable Sync to Shape.';
           syncShapeBtn.disabled = true;
           conciergeBtn.disabled = true;
           return;
         }
-        batchMeta.textContent = `Last batch: ${lastBatchId} — use Sync to Shape if DB imported but Shape is empty.`;
+        batchMeta.textContent = `Batch ${batchId} — Sync to Shape pushes DB rows without shape_lead_id into Shape.`;
         syncShapeBtn.disabled = false;
         conciergeBtn.disabled = false;
       }
 
+      if (lastBatchId) {
+        batchIdInput.value = lastBatchId;
+      }
+
       updateBatchMeta();
+
+      batchIdInput.addEventListener('input', () => {
+        const id = batchIdInput.value.trim();
+        if (id) {
+          lastBatchId = id;
+          localStorage.setItem('mailer_last_batch_id', id);
+        }
+        updateBatchMeta();
+      });
 
       const urlBatchId = new URLSearchParams(window.location.search).get('batch_id');
       if (urlBatchId) {
-        lastBatchId = urlBatchId;
-        localStorage.setItem('mailer_last_batch_id', urlBatchId);
-        updateBatchMeta();
+        setActiveBatchId(urlBatchId);
       }
 
       async function assignConciergeForBatch(batchId) {
@@ -598,6 +633,7 @@
             });
 
             if (!batchId) batchId = payload.batch_id;
+            setActiveBatchId(batchId);
             aggregated.batch_id = batchId;
             aggregated.chunks.push(payload);
             aggregated.async_shape_sync =
@@ -637,8 +673,7 @@
           }
 
           lastBatchId = batchId;
-          localStorage.setItem('mailer_last_batch_id', batchId);
-          updateBatchMeta();
+          setActiveBatchId(batchId);
 
           resultEl.textContent = JSON.stringify(aggregated, null, 2);
           setStatus(
@@ -696,14 +731,15 @@
       }
 
       syncShapeBtn.addEventListener('click', async () => {
-        if (!lastBatchId) {
-          alert('Import a batch first (or paste batch id in batch label field).');
+        const batchId = getActiveBatchId();
+        if (!batchId) {
+          alert('Paste your batch ID in the Batch ID field (from import result JSON).');
           return;
         }
         try {
           syncShapeBtn.disabled = true;
           conciergeBtn.disabled = true;
-          const result = await syncShapeBatchLoop(lastBatchId);
+          const result = await syncShapeBatchLoop(batchId);
           resultEl.textContent = JSON.stringify(result, null, 2);
           setStatus(
             result.remaining_without_shape
@@ -719,13 +755,14 @@
       });
 
       conciergeBtn.addEventListener('click', async () => {
-        if (!lastBatchId) {
-          alert('Import a batch first.');
+        const batchId = getActiveBatchId();
+        if (!batchId) {
+          alert('Paste your batch ID in the Batch ID field.');
           return;
         }
         try {
           conciergeBtn.disabled = true;
-          await assignConciergeForBatch(lastBatchId);
+          await assignConciergeForBatch(batchId);
         } catch (error) {
           showError(error);
         } finally {
