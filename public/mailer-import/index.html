@@ -269,9 +269,11 @@
         <div class="actions">
           <button id="preview-btn" class="secondary" disabled>Test API (dry run)</button>
           <button id="import-btn" class="primary" disabled>Import to database + Shape</button>
+          <button id="sync-shape-btn" class="secondary" type="button" disabled>Sync to Shape (batch)</button>
           <button id="concierge-btn" class="secondary" type="button" disabled>Assign Concierge (Shape)</button>
         </div>
         <p id="file-meta" class="hint"></p>
+        <p id="batch-meta" class="hint" style="margin-top:0.35rem"></p>
       </section>
 
       <section class="card">
@@ -313,15 +315,36 @@
       const previewBtn = document.getElementById('preview-btn');
       const importBtn = document.getElementById('import-btn');
       const conciergeBtn = document.getElementById('concierge-btn');
+      const syncShapeBtn = document.getElementById('sync-shape-btn');
+      const batchMeta = document.getElementById('batch-meta');
       const previewBody = document.getElementById('preview-body');
       const resultEl = document.getElementById('result');
       const statusBadge = document.getElementById('status-badge');
       const fileMeta = document.getElementById('file-meta');
 
       let parsedRows = [];
-      let lastBatchId = null;
+      let lastBatchId = localStorage.getItem('mailer_last_batch_id') || null;
 
-      async function assignConciergeForBatch(batchId) {
+      function updateBatchMeta() {
+        if (!lastBatchId) {
+          batchMeta.textContent = '';
+          syncShapeBtn.disabled = true;
+          conciergeBtn.disabled = true;
+          return;
+        }
+        batchMeta.textContent = `Last batch: ${lastBatchId} — use Sync to Shape if DB imported but Shape is empty.`;
+        syncShapeBtn.disabled = false;
+        conciergeBtn.disabled = false;
+      }
+
+      updateBatchMeta();
+
+      const urlBatchId = new URLSearchParams(window.location.search).get('batch_id');
+      if (urlBatchId) {
+        lastBatchId = urlBatchId;
+        localStorage.setItem('mailer_last_batch_id', urlBatchId);
+        updateBatchMeta();
+      }
         setStatus('Assigning Concierge in Shape…', '');
         const payload = await callImport({
           dryRun: false,
@@ -451,6 +474,7 @@
         deferShape = false,
         shapeSyncOnly = false,
         conciergeAssign = false,
+        shapeSyncBatch = false,
       }) {
         const response = await fetch('/api/import-mailer-list', {
           method: 'POST',
@@ -460,13 +484,14 @@
           },
           body: JSON.stringify({
             batch_label: batchInput.value.trim(),
-            sync_shape: syncShapeInput.checked && !deferShape && !shapeSyncOnly && !conciergeAssign,
+            sync_shape: syncShapeInput.checked && !deferShape && !shapeSyncOnly && !conciergeAssign && !shapeSyncBatch,
             defer_shape: deferShape,
             shape_sync_only: shapeSyncOnly,
             concierge_assign: conciergeAssign,
+            shape_sync_batch: shapeSyncBatch,
             dry_run: dryRun,
             batch_id: batchId,
-            rows: conciergeAssign ? [] : rows,
+            rows: conciergeAssign || shapeSyncBatch ? [] : rows,
           }),
         });
 
@@ -619,7 +644,8 @@
           }
 
           lastBatchId = batchId;
-          conciergeBtn.disabled = !batchId;
+          localStorage.setItem('mailer_last_batch_id', batchId);
+          updateBatchMeta();
 
           resultEl.textContent = JSON.stringify(aggregated, null, 2);
           setStatus(
@@ -636,6 +662,64 @@
         }
       });
 
+      async function syncShapeBatchLoop(batchId) {
+        let totalCreated = 0;
+        let totalFailed = 0;
+        const allErrors = [];
+
+        while (true) {
+          const payload = await callImport({
+            dryRun: false,
+            batchId,
+            shapeSyncBatch: true,
+          });
+          const s = payload.shape_sync_batch || {};
+          totalCreated += s.shape_created || 0;
+          totalFailed += s.shape_failed || 0;
+          if (s.errors?.length) allErrors.push(...s.errors);
+
+          const remaining = s.remaining_without_shape ?? 0;
+          setStatus(
+            `Shape sync… ${totalCreated} created, ${remaining} remaining`,
+            remaining ? '' : 'ok',
+          );
+
+          if (s.done || remaining === 0 || !s.processed) {
+            return {
+              ok: true,
+              batch_id: batchId,
+              shape_created: totalCreated,
+              shape_failed: totalFailed,
+              remaining_without_shape: remaining,
+              errors: allErrors,
+            };
+          }
+        }
+      }
+
+      syncShapeBtn.addEventListener('click', async () => {
+        if (!lastBatchId) {
+          alert('Import a batch first (or paste batch id in batch label field).');
+          return;
+        }
+        try {
+          syncShapeBtn.disabled = true;
+          conciergeBtn.disabled = true;
+          const result = await syncShapeBatchLoop(lastBatchId);
+          resultEl.textContent = JSON.stringify(result, null, 2);
+          setStatus(
+            result.remaining_without_shape
+              ? `Shape sync partial — ${result.remaining_without_shape} left`
+              : `Shape sync complete (${result.shape_created} created)`,
+            result.remaining_without_shape || result.errors.length ? 'err' : 'ok',
+          );
+        } catch (error) {
+          showError(error);
+        } finally {
+          updateBatchMeta();
+        }
+      });
+
       conciergeBtn.addEventListener('click', async () => {
         if (!lastBatchId) {
           alert('Import a batch first.');
@@ -647,7 +731,7 @@
         } catch (error) {
           showError(error);
         } finally {
-          conciergeBtn.disabled = !lastBatchId;
+          updateBatchMeta();
         }
       });
 

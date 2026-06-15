@@ -62,8 +62,20 @@ export default async function handler(req, res) {
     const shapeSyncOnly = body.shape_sync_only === true || body.shapeSyncOnly === true;
     const conciergeAssignOnly =
       body.concierge_assign === true || body.conciergeAssign === true;
+    const shapeSyncBatch = body.shape_sync_batch === true || body.shapeSyncBatch === true;
 
     const supabase = getSupabaseClient();
+
+    if (shapeSyncBatch && existingBatchId) {
+      const { syncMailerBatchToShape } = await import('../lib/mailer/sync-batch-shape.js');
+      const limit = Math.min(Number(body.limit) || 15, 25);
+      const summary = await syncMailerBatchToShape(supabase, existingBatchId, { limit });
+      return sendJson(res, 200, {
+        ok: true,
+        batch_id: existingBatchId,
+        shape_sync_batch: summary,
+      });
+    }
 
     if (conciergeAssignOnly && existingBatchId) {
       const summary = await assignConciergeOwnersForBatch(supabase, existingBatchId);
