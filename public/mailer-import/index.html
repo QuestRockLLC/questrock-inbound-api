@@ -345,6 +345,8 @@
         localStorage.setItem('mailer_last_batch_id', urlBatchId);
         updateBatchMeta();
       }
+
+      async function assignConciergeForBatch(batchId) {
         setStatus('Assigning Concierge in Shape…', '');
         const payload = await callImport({
           dryRun: false,
@@ -609,31 +611,22 @@
             if (s.errors?.length) aggregated.summary.errors.push(...s.errors);
           }
 
-          if (syncShapeInput.checked && useChunks && batchId) {
-            setStatus('Syncing Shape…', '');
-            const shapePayload = await callImport({
-              dryRun: false,
-              rows: parsedRows,
-              batchId,
-              shapeSyncOnly: true,
-            });
-            aggregated.shape_sync = shapePayload;
-            if (shapePayload.async_shape_sync) {
-              aggregated.async_shape_sync = true;
-              aggregated.message = `${aggregated.summary.db_upserted} rows in Supabase. Shape sync running in background.`;
-            } else if (shapePayload.summary) {
-              aggregated.summary.shape_created += shapePayload.summary.shape_created || 0;
-              aggregated.summary.shape_failed += shapePayload.summary.shape_failed || 0;
-              if (shapePayload.summary.errors?.length) {
-                aggregated.summary.errors.push(...shapePayload.summary.errors);
-              }
+          if (syncShapeInput.checked && batchId && (useChunks || parsedRows.length >= 8)) {
+            setStatus('Syncing Shape (chunked — keep tab open)…', '');
+            const shapeResult = await syncShapeBatchLoop(batchId);
+            aggregated.shape_sync = shapeResult;
+            aggregated.summary.shape_created += shapeResult.shape_created || 0;
+            aggregated.summary.shape_failed += shapeResult.shape_failed || 0;
+            if (shapeResult.errors?.length) {
+              aggregated.summary.errors.push(...shapeResult.errors);
             }
+            aggregated.message =
+              shapeResult.remaining_without_shape
+                ? `${aggregated.summary.db_upserted} in DB. Shape: ${shapeResult.shape_created} created, ${shapeResult.remaining_without_shape} still pending — click Sync to Shape (batch).`
+                : `${aggregated.summary.db_upserted} in DB. Shape sync complete (${shapeResult.shape_created} created).`;
           }
 
-          if (aggregated.async_shape_sync) {
-            aggregated.message =
-              `${aggregated.summary.db_upserted} rows in Supabase. Shape sync running in background — refresh Shape in a few minutes.`;
-          } else if (syncShapeInput.checked && batchId) {
+          if (syncShapeInput.checked && batchId) {
             try {
               setStatus('Assigning Concierge in Shape…', '');
               const conciergePayload = await assignConciergeForBatch(batchId);
@@ -680,7 +673,7 @@
 
           const remaining = s.remaining_without_shape ?? 0;
           setStatus(
-            `Shape sync… ${totalCreated} created, ${remaining} remaining`,
+            `Shape sync… ${totalCreated} created, ${remaining} remaining (keep tab open)`,
             remaining ? '' : 'ok',
           );
 
@@ -694,6 +687,8 @@
               errors: allErrors,
             };
           }
+
+          await new Promise((resolve) => setTimeout(resolve, 300));
         }
       }
 

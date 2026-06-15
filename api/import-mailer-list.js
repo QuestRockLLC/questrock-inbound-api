@@ -1,7 +1,7 @@
-import { waitUntil } from '@vercel/functions';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { importMailerRows, syncMailerRowsToShape } from '../lib/mailer/import.js';
 import { assignConciergeOwnersForBatch } from '../lib/mailer/concierge-assign.js';
+import { syncMailerBatchToShape } from '../lib/mailer/sync-batch-shape.js';
 import { normalizeMailerRows } from '../lib/mailer/normalize.js';
 import { assertInboundSession } from '../lib/request-auth.js';
 import { readJsonBody, sendJson } from '../lib/http.js';
@@ -67,8 +67,7 @@ export default async function handler(req, res) {
     const supabase = getSupabaseClient();
 
     if (shapeSyncBatch && existingBatchId) {
-      const { syncMailerBatchToShape } = await import('../lib/mailer/sync-batch-shape.js');
-      const limit = Math.min(Number(body.limit) || 15, 25);
+      const limit = Math.min(Number(body.limit) || 20, 30);
       const summary = await syncMailerBatchToShape(supabase, existingBatchId, { limit });
       return sendJson(res, 200, {
         ok: true,
@@ -109,22 +108,15 @@ export default async function handler(req, res) {
       }
 
       if (normalized.length >= ASYNC_SHAPE_ROW_THRESHOLD) {
-        waitUntil(
-          syncMailerRowsToShape(supabase, normalized)
-            .then((shapeSummary) => {
-              console.info('[import-mailer-list] background Shape-only sync complete', shapeSummary);
-            })
-            .catch((error) => {
-              console.error('[import-mailer-list] background Shape-only sync failed:', error);
-            }),
-        );
-
-        return sendJson(res, 202, {
+        const limit = Math.min(Number(body.limit) || 20, 30);
+        const summary = await syncMailerBatchToShape(supabase, existingBatchId, { limit });
+        return sendJson(res, 200, {
           ok: true,
           batch_id: existingBatchId,
           shape_sync_only: true,
-          async_shape_sync: true,
-          message: 'Shape sync started in background for all rows.',
+          shape_sync_batch: summary,
+          message:
+            'Bulk shape_sync_only uses chunked batch sync. Repeat until remaining_without_shape is 0.',
         });
       }
 
@@ -138,56 +130,30 @@ export default async function handler(req, res) {
       });
     }
 
-    const useAsyncShape =
-      syncShape && !dryRun && !deferShape && normalized.length >= ASYNC_SHAPE_ROW_THRESHOLD;
-
     const result = await importMailerRows(supabase, {
       rows: normalized,
       batchLabel,
-      syncShape: syncShape && !useAsyncShape && !deferShape,
+      syncShape:
+        syncShape &&
+        !deferShape &&
+        normalized.length < ASYNC_SHAPE_ROW_THRESHOLD,
       dryRun,
       existingBatchId,
     });
 
-    if (useAsyncShape) {
-      const batchId = result.batch_id;
-      waitUntil(
-        (async () => {
-          const shapeSummary = await syncMailerRowsToShape(supabase, normalized);
-          const { data: priorBatch } = await supabase
-            .from('mailer_import_batches')
-            .select('shape_synced_count, error_count')
-            .eq('batch_id', batchId)
-            .single();
-
-          await supabase
-            .from('mailer_import_batches')
-            .update({
-              shape_synced_count:
-                (priorBatch?.shape_synced_count ?? 0) + shapeSummary.shape_created,
-              error_count: (priorBatch?.error_count ?? 0) + shapeSummary.errors.length,
-            })
-            .eq('batch_id', batchId);
-
-          console.info('[import-mailer-list] background Shape sync complete', shapeSummary);
-        })().catch((error) => {
-          console.error('[import-mailer-list] background Shape sync failed:', error);
-        }),
-      );
-
-      return sendJson(res, 202, {
-        ok: true,
-        async_shape_sync: true,
-        message:
-          'All rows saved to Supabase. Shape CRM sync is running in the background (check batch in ~2–5 min).',
-        ...result,
-        skipped_before_import: skipped,
-      });
-    }
+    const shapeSyncDeferred =
+      syncShape &&
+      !dryRun &&
+      !deferShape &&
+      normalized.length >= ASYNC_SHAPE_ROW_THRESHOLD;
 
     return sendJson(res, dryRun ? 200 : 201, {
       ok: true,
       ...result,
+      shape_sync_deferred: shapeSyncDeferred,
+      message: shapeSyncDeferred
+        ? 'Rows saved to Supabase. Shape sync must run via chunked batch sync (UI does this automatically).'
+        : undefined,
       skipped_before_import: skipped,
     });
   } catch (error) {
