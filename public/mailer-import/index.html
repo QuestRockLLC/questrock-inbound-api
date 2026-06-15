@@ -658,6 +658,7 @@
       async function syncShapeBatchLoop(batchId) {
         let totalCreated = 0;
         let totalFailed = 0;
+        let totalConcierge = 0;
         const allErrors = [];
 
         while (true) {
@@ -669,11 +670,12 @@
           const s = payload.shape_sync_batch || {};
           totalCreated += s.shape_created || 0;
           totalFailed += s.shape_failed || 0;
+          totalConcierge += (s.concierge_assigned || 0) + (s.concierge_catch_up?.assigned || 0);
           if (s.errors?.length) allErrors.push(...s.errors);
 
           const remaining = s.remaining_without_shape ?? 0;
           setStatus(
-            `Shape sync… ${totalCreated} created, ${remaining} remaining (keep tab open)`,
+            `Shape sync… ${totalCreated} created, ${totalConcierge} → Concierge, ${remaining} left (keep tab open)`,
             remaining ? '' : 'ok',
           );
 
@@ -683,6 +685,7 @@
               batch_id: batchId,
               shape_created: totalCreated,
               shape_failed: totalFailed,
+              concierge_assigned: totalConcierge,
               remaining_without_shape: remaining,
               errors: allErrors,
             };
