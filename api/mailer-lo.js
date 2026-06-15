@@ -7,6 +7,7 @@ import {
 } from '../lib/mailer-lo/search.js';
 import {
   buildLeadBrief,
+  buildLeadShapeNotesPreview,
   buildLeadScript,
   getMailerLeadDetail,
 } from '../lib/mailer-lo/lead-detail.js';
@@ -14,6 +15,7 @@ import { assignMailerLeadToLo } from '../lib/mailer-lo/assign.js';
 import { getActiveMailerCampaign } from '../lib/mailer-lo/campaigns.js';
 import { DEFAULT_MAILER_CALL_SCRIPT } from '../lib/mailer-lo/default-call-script.js';
 import { getShapeLoRoster } from '../lib/shape/lo-roster.js';
+import { buildShapeProspectUrl } from '../lib/shape/prospect-url.js';
 import { canAccessLead } from '../lib/inbound-access.js';
 import { readJsonBody, sendJson } from '../lib/http.js';
 
@@ -132,6 +134,8 @@ export default async function handler(req, res) {
         ok: true,
         ...detail,
         brief: buildLeadBrief(detail.mailer_lead),
+        shape_notes_sidebar: buildLeadShapeNotesPreview(detail.mailer_lead),
+        shape_prospect_url: buildShapeProspectUrl(detail.mailer_lead.shape_lead_id),
         call_script: buildLeadScript(detail.mailer_lead, loName, scriptTemplate),
       });
     } catch (error) {

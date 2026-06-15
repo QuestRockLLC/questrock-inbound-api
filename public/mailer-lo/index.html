@@ -173,6 +173,24 @@
         line-height: 1.55;
         white-space: pre-wrap;
       }
+      .notes-sidebar label {
+        display: block;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--muted);
+        margin-bottom: 0.35rem;
+      }
+      .notes-sidebar-box {
+        margin: 0;
+        font-size: 0.82rem;
+        line-height: 1.5;
+        background: #f5f5f4;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.85rem 1rem;
+        white-space: pre-wrap;
+        color: var(--ink);
+      }
       .script-box {
         background: #1f2a24;
         color: #e8f5e9;
@@ -269,6 +287,10 @@
                 <span id="lead-assigned" class="pill"></span>
               </div>
               <div id="lead-brief" class="brief" style="margin-top:1rem"></div>
+              <div id="lead-notes-sidebar" class="notes-sidebar" style="margin-top:1rem" hidden>
+                <label>Shape notes sidebar</label>
+                <pre id="shape-notes-sidebar" class="notes-sidebar-box"></pre>
+              </div>
               <div style="margin-top:1rem;display:flex;gap:0.5rem;flex-wrap:wrap">
                 <button id="assign-btn" type="button">Assign to me</button>
                 <button id="open-shape" type="button" class="secondary" hidden>Open in Shape</button>
@@ -374,13 +396,24 @@
           ? `Assigned: ${m.assigned_lo_name}`
           : 'Unassigned';
         document.getElementById('lead-brief').innerHTML = formatBrief(data.brief);
+        const notesEl = document.getElementById('lead-notes-sidebar');
+        const notesBox = document.getElementById('shape-notes-sidebar');
+        if (data.shape_notes_sidebar) {
+          notesEl.hidden = false;
+          notesBox.textContent = data.shape_notes_sidebar;
+        } else {
+          notesEl.hidden = true;
+          notesBox.textContent = '';
+        }
         document.getElementById('call-script').textContent = data.call_script;
 
         const shapeBtn = document.getElementById('open-shape');
         if (m.shape_lead_id) {
           shapeBtn.hidden = false;
-          shapeBtn.onclick = () =>
-            window.open(`https://secure.setshape.com/lead/${m.shape_lead_id}`, '_blank');
+          const shapeUrl =
+            data.shape_prospect_url ||
+            `https://secure.setshape.com/prospects/${m.shape_lead_id}/edit`;
+          shapeBtn.onclick = () => window.open(shapeUrl, '_blank');
         } else {
           shapeBtn.hidden = true;
         }
