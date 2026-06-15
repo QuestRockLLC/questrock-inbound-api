@@ -1,7 +1,7 @@
 import { getSupabaseClient } from '../lib/supabase.js';
 import { importMailerRows, syncMailerRowsToShape } from '../lib/mailer/import.js';
 import { assignConciergeOwnersForBatch } from '../lib/mailer/concierge-assign.js';
-import { syncMailerBatchToShape } from '../lib/mailer/sync-batch-shape.js';
+import { syncMailerBatchToShape, countMailerLeadsWithoutShape } from '../lib/mailer/sync-batch-shape.js';
 import { normalizeMailerRows } from '../lib/mailer/normalize.js';
 import { assertInboundSession } from '../lib/request-auth.js';
 import { readJsonBody, sendJson } from '../lib/http.js';
@@ -23,6 +23,42 @@ export default async function handler(req, res) {
     try {
       assertInboundSession(req, { requireAdmin: true });
       const supabase = getSupabaseClient();
+      const batchId = String(req.query?.batch_id ?? req.query?.batchId ?? '').trim();
+
+      if (batchId) {
+        const { data: batch, error: batchError } = await supabase
+          .from('mailer_import_batches')
+          .select('*')
+          .eq('batch_id', batchId)
+          .maybeSingle();
+
+        if (batchError) {
+          throw batchError;
+        }
+
+        const { count: totalInBatch, error: totalError } = await supabase
+          .from('mailer_leads')
+          .select('mailer_lead_id', { count: 'exact', head: true })
+          .eq('import_batch_id', batchId);
+
+        if (totalError) {
+          throw totalError;
+        }
+
+        const pendingWithoutShape = batch
+          ? await countMailerLeadsWithoutShape(supabase, batchId)
+          : 0;
+
+        return sendJson(res, 200, {
+          ok: true,
+          batch,
+          batch_id: batchId,
+          total_in_batch: totalInBatch ?? 0,
+          pending_without_shape: pendingWithoutShape,
+          batch_found: Boolean(batch),
+        });
+      }
+
       const limit = Math.min(Number(req.query?.limit) || 10, 50);
 
       const { data: batches, error } = await supabase
@@ -67,7 +103,7 @@ export default async function handler(req, res) {
     const supabase = getSupabaseClient();
 
     if (shapeSyncBatch && existingBatchId) {
-      const limit = Math.min(Number(body.limit) || 20, 30);
+      const limit = Math.min(Number(body.limit) || 3, 5);
       const summary = await syncMailerBatchToShape(supabase, existingBatchId, { limit });
       return sendJson(res, 200, {
         ok: true,

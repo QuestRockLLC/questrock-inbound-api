@@ -282,6 +282,7 @@
         </div>
         <p id="file-meta" class="hint"></p>
         <p id="batch-meta" class="hint" style="margin-top:0.35rem"></p>
+        <p id="sync-progress" class="hint" style="margin-top:0.35rem;font-weight:600;color:var(--ink)"></p>
       </section>
 
       <section class="card">
@@ -326,6 +327,7 @@
       const conciergeBtn = document.getElementById('concierge-btn');
       const syncShapeBtn = document.getElementById('sync-shape-btn');
       const batchMeta = document.getElementById('batch-meta');
+      const syncProgress = document.getElementById('sync-progress');
       const previewBody = document.getElementById('preview-body');
       const resultEl = document.getElementById('result');
       const statusBadge = document.getElementById('status-badge');
@@ -374,11 +376,35 @@
           localStorage.setItem('mailer_last_batch_id', id);
         }
         updateBatchMeta();
+        refreshBatchStatus().catch(() => {});
       });
+
+      async function refreshBatchStatus() {
+        const batchId = getActiveBatchId();
+        if (!batchId) return;
+        try {
+          const data = await InboundAuth.apiGet(
+            `/api/import-mailer-list?batch_id=${encodeURIComponent(batchId)}`,
+          );
+          if (!data.batch_found) {
+            batchMeta.textContent = `Batch ID not found in database: ${batchId}`;
+            syncShapeBtn.disabled = true;
+            return;
+          }
+          batchMeta.textContent = `Batch ${batchId}: ${data.total_in_batch} in DB · ${data.pending_without_shape} still need Shape`;
+          syncShapeBtn.disabled = false;
+          conciergeBtn.disabled = false;
+        } catch (e) {
+          batchMeta.textContent = `Could not load batch: ${e.message}`;
+        }
+      }
 
       const urlBatchId = new URLSearchParams(window.location.search).get('batch_id');
       if (urlBatchId) {
         setActiveBatchId(urlBatchId);
+        refreshBatchStatus().catch(() => {});
+      } else if (lastBatchId) {
+        refreshBatchStatus().catch(() => {});
       }
 
       async function assignConciergeForBatch(batchId) {
@@ -569,7 +595,12 @@
 
       function showError(error) {
         setStatus('Error', 'err');
-        resultEl.textContent = JSON.stringify({ ok: false, error: error.message }, null, 2);
+        const msg = error.message || String(error);
+        const hint =
+          msg.includes('504') || msg.includes('timeout')
+            ? 'Gateway timeout — the server took too long. Progress is saved. Click Sync to Shape (batch) again to continue.'
+            : msg;
+        resultEl.textContent = JSON.stringify({ ok: false, error: hint }, null, 2);
       }
 
       previewBtn.addEventListener('click', async () => {
@@ -694,25 +725,57 @@
         let totalCreated = 0;
         let totalFailed = 0;
         let totalConcierge = 0;
+        let iteration = 0;
         const allErrors = [];
+        const chunks = [];
 
         while (true) {
+          iteration += 1;
+          syncProgress.textContent = `Request ${iteration}… creating leads in Shape (this can take 30–90s per batch).`;
+          resultEl.textContent = JSON.stringify(
+            {
+              status: 'running',
+              batch_id: batchId,
+              iteration,
+              shape_created_so_far: totalCreated,
+              pending_estimate: 'loading…',
+            },
+            null,
+            2,
+          );
+          resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
           const payload = await callImport({
             dryRun: false,
             batchId,
             shapeSyncBatch: true,
           });
           const s = payload.shape_sync_batch || {};
+          chunks.push(s);
           totalCreated += s.shape_created || 0;
           totalFailed += s.shape_failed || 0;
-          totalConcierge += (s.concierge_assigned || 0) + (s.concierge_catch_up?.assigned || 0);
+          totalConcierge += s.concierge_assigned || 0;
           if (s.errors?.length) allErrors.push(...s.errors);
 
           const remaining = s.remaining_without_shape ?? 0;
+          const progress = {
+            status: 'running',
+            batch_id: batchId,
+            iteration,
+            last_chunk: s,
+            shape_created: totalCreated,
+            shape_failed: totalFailed,
+            concierge_assigned: totalConcierge,
+            remaining_without_shape: remaining,
+          };
+          resultEl.textContent = JSON.stringify(progress, null, 2);
           setStatus(
-            `Shape sync… ${totalCreated} created, ${totalConcierge} → Concierge, ${remaining} left (keep tab open)`,
+            `Shape sync… ${totalCreated} created, ${totalConcierge} → Concierge, ${remaining} left`,
             remaining ? '' : 'ok',
           );
+          syncProgress.textContent = progress.status === 'running'
+            ? `${totalCreated} in Shape so far · ${remaining} remaining — keep this tab open`
+            : '';
 
           if (s.done || remaining === 0 || !s.processed) {
             return {
@@ -722,11 +785,13 @@
               shape_failed: totalFailed,
               concierge_assigned: totalConcierge,
               remaining_without_shape: remaining,
+              iterations: iteration,
+              chunks,
               errors: allErrors,
             };
           }
 
-          await new Promise((resolve) => setTimeout(resolve, 300));
+          await new Promise((resolve) => setTimeout(resolve, 400));
         }
       }
 
@@ -739,17 +804,26 @@
         try {
           syncShapeBtn.disabled = true;
           conciergeBtn.disabled = true;
+          importBtn.disabled = true;
+          syncProgress.textContent = 'Checking batch…';
+          await refreshBatchStatus();
+          syncProgress.textContent = 'Starting Shape sync…';
           const result = await syncShapeBatchLoop(batchId);
-          resultEl.textContent = JSON.stringify(result, null, 2);
+          resultEl.textContent = JSON.stringify({ ok: true, ...result }, null, 2);
+          syncProgress.textContent = result.remaining_without_shape
+            ? `Stopped with ${result.remaining_without_shape} still pending — click Sync again to continue`
+            : `Done — ${result.shape_created} leads created in Shape`;
           setStatus(
             result.remaining_without_shape
-              ? `Shape sync partial — ${result.remaining_without_shape} left`
+              ? `Partial — ${result.remaining_without_shape} left`
               : `Shape sync complete (${result.shape_created} created)`,
             result.remaining_without_shape || result.errors.length ? 'err' : 'ok',
           );
         } catch (error) {
+          syncProgress.textContent = `Error: ${error.message}`;
           showError(error);
         } finally {
+          importBtn.disabled = !parsedRows.length;
           updateBatchMeta();
         }
       });
