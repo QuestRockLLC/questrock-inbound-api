@@ -262,10 +262,10 @@
       <section class="card">
         <label>Spreadsheet file (.csv or .xlsx)</label>
         <div id="dropzone" class="dropzone" tabindex="0">
-          <p><strong>Drop file here</strong> or click to browse</p>
-          <p class="hint">Expected columns: Full Name, Address, Offer Code, MTGAMT, LENDER, Mail Date, Expir, …<br />Table above is local only. <strong>Test API</strong> or <strong>Import</strong> hits the server (admin sign-in required).</p>
+          <p><strong>Drop file(s) here</strong> or click to browse</p>
+          <p class="hint">Drop both W624 files together: <strong>QUEST ROCK INT CASH4 DATAFILE W624.csv</strong> (FHA Cash Out) and <strong>QUESTROCK ITA IRRL DATA FILE W624.csv</strong> (FHA Streamline).<br />Expected columns: Full Name, Address, Offer Code, MTGAMT, NEW_PI_PAY, Mail Date, Expir, TYPE, …</p>
         </div>
-        <input id="file-input" type="file" accept=".csv,.xlsx,.xls" hidden />
+        <input id="file-input" type="file" accept=".csv,.xlsx,.xls" multiple hidden />
         <div class="actions">
           <button id="preview-btn" class="secondary" disabled>Test API (dry run)</button>
           <button id="import-btn" class="primary" disabled>Import to database + Shape</button>
@@ -399,12 +399,14 @@
       }
 
       function parseWorkbook(file) {
+        const isCsv = /\.csv$/i.test(file.name);
         return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (event) => {
             try {
-              const data = new Uint8Array(event.target.result);
-              const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+              const workbook = isCsv
+                ? XLSX.read(event.target.result, { type: 'string', cellDates: true })
+                : XLSX.read(new Uint8Array(event.target.result), { type: 'array', cellDates: true });
               const sheetName = workbook.SheetNames[0];
               const sheet = workbook.Sheets[sheetName];
               const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
@@ -414,19 +416,30 @@
             }
           };
           reader.onerror = () => reject(reader.error);
-          reader.readAsArrayBuffer(file);
+          if (isCsv) {
+            reader.readAsText(file);
+          } else {
+            reader.readAsArrayBuffer(file);
+          }
         });
       }
 
-      async function handleFile(file) {
-        if (!file) return;
+      async function handleFiles(fileList) {
+        const files = Array.from(fileList || []).filter(Boolean);
+        if (!files.length) return;
         setStatus('Parsing…', '');
-        parsedRows = await parseWorkbook(file);
+        const parts = [];
+        for (const file of files) {
+          const rows = await parseWorkbook(file);
+          parts.push({ name: file.name, rows });
+        }
+        parsedRows = parts.flatMap((part) => part.rows);
         renderPreview(parsedRows);
         previewBtn.disabled = !parsedRows.length;
         importBtn.disabled = !parsedRows.length;
-        fileMeta.textContent = `${file.name} — ${parsedRows.length} row(s) loaded`;
-        setStatus('File loaded', 'ok');
+        const summary = parts.map((part) => `${part.name}: ${part.rows.length}`).join(' · ');
+        fileMeta.textContent = `${parts.length} file(s) — ${parsedRows.length} total row(s) (${summary})`;
+        setStatus('Files loaded', 'ok');
       }
 
       const CHUNK_SIZE = 10;
@@ -486,10 +499,10 @@
       dropzone.addEventListener('drop', (event) => {
         event.preventDefault();
         dropzone.classList.remove('dragover');
-        handleFile(event.dataTransfer.files[0]).catch(showError);
+        handleFiles(event.dataTransfer.files).catch(showError);
       });
       fileInput.addEventListener('change', () => {
-        handleFile(fileInput.files[0]).catch(showError);
+        handleFiles(fileInput.files).catch(showError);
       });
 
       function showError(error) {
