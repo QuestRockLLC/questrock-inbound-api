@@ -269,6 +269,7 @@
         <div class="actions">
           <button id="preview-btn" class="secondary" disabled>Test API (dry run)</button>
           <button id="import-btn" class="primary" disabled>Import to database + Shape</button>
+          <button id="concierge-btn" class="secondary" type="button" disabled>Assign Concierge (Shape)</button>
         </div>
         <p id="file-meta" class="hint"></p>
       </section>
@@ -311,12 +312,32 @@
       const fileInput = document.getElementById('file-input');
       const previewBtn = document.getElementById('preview-btn');
       const importBtn = document.getElementById('import-btn');
+      const conciergeBtn = document.getElementById('concierge-btn');
       const previewBody = document.getElementById('preview-body');
       const resultEl = document.getElementById('result');
       const statusBadge = document.getElementById('status-badge');
       const fileMeta = document.getElementById('file-meta');
 
       let parsedRows = [];
+      let lastBatchId = null;
+
+      async function assignConciergeForBatch(batchId) {
+        setStatus('Assigning Concierge in Shape…', '');
+        const payload = await callImport({
+          dryRun: false,
+          batchId,
+          conciergeAssign: true,
+        });
+        resultEl.textContent = JSON.stringify(payload, null, 2);
+        const summary = payload.concierge_assignment || {};
+        setStatus(
+          summary.failed
+            ? `Concierge: ${summary.assigned} ok, ${summary.failed} failed`
+            : `Concierge assigned (${summary.assigned || 0})`,
+          summary.failed ? 'err' : 'ok',
+        );
+        return payload;
+      }
 
       if (!batchInput.value) {
         batchInput.value = new Date().toISOString().slice(0, 10);
@@ -416,6 +437,7 @@
         batchId = null,
         deferShape = false,
         shapeSyncOnly = false,
+        conciergeAssign = false,
       }) {
         const response = await fetch('/api/import-mailer-list', {
           method: 'POST',
@@ -425,12 +447,13 @@
           },
           body: JSON.stringify({
             batch_label: batchInput.value.trim(),
-            sync_shape: syncShapeInput.checked && !deferShape && !shapeSyncOnly,
+            sync_shape: syncShapeInput.checked && !deferShape && !shapeSyncOnly && !conciergeAssign,
             defer_shape: deferShape,
             shape_sync_only: shapeSyncOnly,
+            concierge_assign: conciergeAssign,
             dry_run: dryRun,
             batch_id: batchId,
-            rows,
+            rows: conciergeAssign ? [] : rows,
           }),
         });
 
@@ -572,7 +595,18 @@
           if (aggregated.async_shape_sync) {
             aggregated.message =
               `${aggregated.summary.db_upserted} rows in Supabase. Shape sync running in background — refresh Shape in a few minutes.`;
+          } else if (syncShapeInput.checked && batchId) {
+            try {
+              setStatus('Assigning Concierge in Shape…', '');
+              const conciergePayload = await assignConciergeForBatch(batchId);
+              aggregated.concierge_assignment = conciergePayload.concierge_assignment;
+            } catch (conciergeError) {
+              aggregated.concierge_assignment_error = conciergeError.message;
+            }
           }
+
+          lastBatchId = batchId;
+          conciergeBtn.disabled = !batchId;
 
           resultEl.textContent = JSON.stringify(aggregated, null, 2);
           setStatus(
@@ -586,6 +620,21 @@
         } finally {
           importBtn.disabled = !parsedRows.length;
           previewBtn.disabled = !parsedRows.length;
+        }
+      });
+
+      conciergeBtn.addEventListener('click', async () => {
+        if (!lastBatchId) {
+          alert('Import a batch first.');
+          return;
+        }
+        try {
+          conciergeBtn.disabled = true;
+          await assignConciergeForBatch(lastBatchId);
+        } catch (error) {
+          showError(error);
+        } finally {
+          conciergeBtn.disabled = !lastBatchId;
         }
       });
 

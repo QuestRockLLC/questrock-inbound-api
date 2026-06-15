@@ -1,6 +1,7 @@
 import { waitUntil } from '@vercel/functions';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { importMailerRows, syncMailerRowsToShape } from '../lib/mailer/import.js';
+import { assignConciergeOwnersForBatch } from '../lib/mailer/concierge-assign.js';
 import { normalizeMailerRows } from '../lib/mailer/normalize.js';
 import { assertInboundSession } from '../lib/request-auth.js';
 import { readJsonBody, sendJson } from '../lib/http.js';
@@ -59,6 +60,19 @@ export default async function handler(req, res) {
     const existingBatchId = body.batch_id ?? body.batchId ?? null;
     const deferShape = body.defer_shape === true || body.deferShape === true;
     const shapeSyncOnly = body.shape_sync_only === true || body.shapeSyncOnly === true;
+    const conciergeAssignOnly =
+      body.concierge_assign === true || body.conciergeAssign === true;
+
+    const supabase = getSupabaseClient();
+
+    if (conciergeAssignOnly && existingBatchId) {
+      const summary = await assignConciergeOwnersForBatch(supabase, existingBatchId);
+      return sendJson(res, 200, {
+        ok: true,
+        batch_id: existingBatchId,
+        concierge_assignment: summary,
+      });
+    }
 
     if (!rawRows.length) {
       return sendJson(res, 400, {
@@ -76,8 +90,6 @@ export default async function handler(req, res) {
         skipped,
       });
     }
-
-    const supabase = getSupabaseClient();
 
     if (shapeSyncOnly) {
       if (!existingBatchId) {

@@ -12,6 +12,7 @@ import {
 } from '../lib/mailer-lo/lead-detail.js';
 import { assignMailerLeadToLo } from '../lib/mailer-lo/assign.js';
 import { getActiveMailerCampaign } from '../lib/mailer-lo/campaigns.js';
+import { DEFAULT_MAILER_CALL_SCRIPT } from '../lib/mailer-lo/default-call-script.js';
 import { getShapeLoRoster } from '../lib/shape/lo-roster.js';
 import { canAccessLead } from '../lib/inbound-access.js';
 import { readJsonBody, sendJson } from '../lib/http.js';
@@ -123,11 +124,15 @@ export default async function handler(req, res) {
         return sendJson(res, 403, { ok: false, error: 'This lead is assigned to another LO.' });
       }
 
+      const campaign = await getActiveMailerCampaign(getSupabaseClient());
+      const scriptTemplate =
+        campaign?.script_markdown?.trim() || DEFAULT_MAILER_CALL_SCRIPT;
+
       return sendJson(res, 200, {
         ok: true,
         ...detail,
         brief: buildLeadBrief(detail.mailer_lead),
-        call_script: buildLeadScript(detail.mailer_lead, loName),
+        call_script: buildLeadScript(detail.mailer_lead, loName, scriptTemplate),
       });
     } catch (error) {
       return sendJson(res, error.statusCode || 500, {

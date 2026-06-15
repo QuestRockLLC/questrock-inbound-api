@@ -115,12 +115,18 @@
         margin-bottom: 0.5rem;
         background: #fff;
         cursor: pointer;
+        color: var(--ink);
       }
       .result-item:hover, .result-item.active {
         border-color: var(--accent);
         background: var(--accent-soft);
+        color: var(--ink);
       }
-      .result-item strong { display: block; }
+      .result-item strong {
+        display: block;
+        color: #1f2a24;
+        font-weight: 600;
+      }
       .result-item span { font-size: 0.85rem; color: var(--muted); }
       .pill {
         display: inline-block;
@@ -135,6 +141,30 @@
       .tabs button.active { background: var(--accent); color: #fff; }
       .panel { display: none; }
       .panel.active { display: block; }
+      .mail-doc-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: grid;
+        gap: 0.75rem;
+      }
+      .mail-doc-list li {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0.85rem 1rem;
+        background: #fff;
+      }
+      .mail-doc-list a {
+        color: var(--accent);
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .mail-doc-list a:hover { text-decoration: underline; }
+      .mail-doc-list .doc-meta {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-top: 0.25rem;
+      }
       .brief {
         background: #f0f7f2;
         border-left: 4px solid var(--accent);
@@ -222,7 +252,7 @@
               <input id="search-q" type="text" placeholder="Name, offer code, address, phone…" />
               <button id="search-btn" type="button">Search</button>
             </div>
-            <p style="font-size:0.8rem;color:var(--muted);margin:0.5rem 0 0">Your assigned leads and unassigned pool load automatically.</p>
+            <p style="font-size:0.8rem;color:var(--muted);margin:0.5rem 0 0">Search by name, offer code, address, or phone. Leads are not listed until you search.</p>
           </div>
           <div class="card results" id="results"></div>
         </aside>
@@ -260,8 +290,8 @@
               <div id="panel-mail" class="panel">
                 <h3 id="week-label" style="margin-top:0"></h3>
                 <p id="week-meta" class="sub"></p>
-                <p><a id="pdf-link" href="#" target="_blank" rel="noopener">Open mail PDF for this week</a></p>
-                <p class="sub">Upload PDF URL in Vercel as <code>MAILER_CURRENT_WEEK_PDF_URL</code> or add a row in <code>mailer_campaigns</code>.</p>
+                <p class="sub" style="margin-bottom:0.75rem">Each PDF has two proof copies of that letter (four letters total this week).</p>
+                <ul id="mail-documents" class="mail-doc-list"></ul>
               </div>
               <div id="panel-history" class="panel">
                 <div id="history-list"></div>
@@ -377,23 +407,48 @@
         document.getElementById('week-meta').textContent = c.mail_drop_date
           ? `Mail drop: ${c.mail_drop_date}`
           : 'Weekly refinance mailer';
-        const pdf = document.getElementById('pdf-link');
-        if (c.pdf_url) {
-          pdf.href = c.pdf_url;
-          pdf.textContent = 'Open mail PDF for this week';
+
+        const docs = c.mail_documents || [];
+        const listEl = document.getElementById('mail-documents');
+
+        if (!docs.length && c.pdf_url) {
+          listEl.innerHTML = `<li><a href="${c.pdf_url}" target="_blank" rel="noopener">Open mail PDF for this week</a></li>`;
+        } else if (!docs.length) {
+          listEl.innerHTML = '<li class="doc-meta">Letter PDFs not configured yet.</li>';
         } else {
-          pdf.href = '#';
-          pdf.textContent = 'PDF not configured yet';
-          pdf.onclick = (e) => e.preventDefault();
+          listEl.innerHTML = docs
+            .map((doc) => {
+              const copies =
+                doc.proof_copies != null ? `${doc.proof_copies} proof copies in PDF` : '';
+              const source = doc.source_file ? doc.source_file : '';
+              const meta = [copies, source].filter(Boolean).join(' · ');
+              return `<li>
+                <a href="${doc.pdf_url}" target="_blank" rel="noopener">${doc.label}</a>
+                ${meta ? `<div class="doc-meta">${meta}</div>` : ''}
+              </li>`;
+            })
+            .join('');
         }
+
         return campaignCache;
+      }
+
+      function showSearchPrompt() {
+        resultsEl.innerHTML =
+          '<p class="empty">Search for a lead by name, offer code, address, or phone.</p>';
+        setStatus('Search to load leads', '');
       }
 
       document.getElementById('search-btn').addEventListener('click', async () => {
         try {
           const q = searchInput.value.trim();
+          if (!q) {
+            showSearchPrompt();
+            return;
+          }
           const data = await apiGet(`/api/mailer-lo/search?q=${encodeURIComponent(q)}`);
           renderResults(data.results);
+          setStatus(`${data.results?.length || 0} matches`, 'ok');
         } catch (e) {
           resultsEl.innerHTML = `<p class="empty" style="color:#9b2226">${e.message}</p>`;
         }
@@ -517,7 +572,7 @@
           document.getElementById('lo-display').textContent = `${currentUser.name} (admin)`;
         }
 
-        await loadMyLeads();
+        showSearchPrompt();
         loadCampaign().catch(() => {});
       })();
     </script>
