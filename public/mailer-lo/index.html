@@ -400,7 +400,7 @@
         const notesBox = document.getElementById('shape-notes-sidebar');
         if (data.shape_notes_sidebar) {
           notesEl.hidden = false;
-          notesBox.textContent = data.shape_notes_sidebar;
+          notesBox.textContent = data.shape_notes_sidebar.replace(/<br\s*\/?>/gi, '\n');
         } else {
           notesEl.hidden = true;
           notesBox.textContent = '';

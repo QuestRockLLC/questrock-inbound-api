@@ -9,6 +9,7 @@ import {
   buildLeadBrief,
   buildLeadShapeNotesPreview,
   buildLeadScript,
+  buildLeadDetailForLoDesk,
   getMailerLeadDetail,
 } from '../lib/mailer-lo/lead-detail.js';
 import { assignMailerLeadToLo } from '../lib/mailer-lo/assign.js';
@@ -133,6 +134,7 @@ export default async function handler(req, res) {
       return sendJson(res, 200, {
         ok: true,
         ...detail,
+        mailer_lead: buildLeadDetailForLoDesk(detail.mailer_lead),
         brief: buildLeadBrief(detail.mailer_lead),
         shape_notes_sidebar: buildLeadShapeNotesPreview(detail.mailer_lead),
         shape_prospect_url: buildShapeProspectUrl(detail.mailer_lead.shape_lead_id),
