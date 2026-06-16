@@ -108,7 +108,7 @@ export default async function handler(req, res) {
     const callData = parseCallAnsweredPayload(body);
     const supabase = getSupabaseClient();
 
-    const { lead, created } = await upsertLeadFromShapeCall(supabase, {
+    const { lead, created, mailerMatched } = await upsertLeadFromShapeCall(supabase, {
       shapeLeadId: callData.shapeLeadId,
       fullName: callData.fullName,
       phoneNumber: callData.phoneNumber,
@@ -156,6 +156,7 @@ export default async function handler(req, res) {
       current_status_label: lead.current_status_label,
       current_status_color: lead.current_status_color,
       shape_sync: shapeSync,
+      mailer_matched: mailerMatched ?? null,
     });
   } catch (error) {
     console.error('[call-answered] failed:', error);
