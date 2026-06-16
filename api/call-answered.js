@@ -3,6 +3,7 @@ import { upsertLeadFromShapeCall } from '../lib/leads.js';
 import { insertInitialCallTranscript } from '../lib/transcripts.js';
 import { assertAuthorized, normalizePayload, readJsonBody, sendJson } from '../lib/http.js';
 import { resolveLeadPhone } from '../lib/zoom-payload.js';
+import { updateShapeLeadFields } from '../lib/shape/client.js';
 
 function parseCallAnsweredPayload(body) {
   const normalized = normalizePayload(body);
@@ -125,6 +126,26 @@ export default async function handler(req, res) {
       timestamp: callData.timestamp,
     });
 
+    // Immediately push known caller fields back to Shape so the lead is
+    // always enriched with phone / name even before the transcript arrives.
+    const shapeFieldsToSync = {};
+    if (callData.phoneNumber) {
+      shapeFieldsToSync.phone = callData.phoneNumber;
+    }
+    if (callData.fullName) {
+      const nameParts = callData.fullName.trim().split(/\s+/);
+      if (nameParts[0]) shapeFieldsToSync.firstname = nameParts[0];
+      if (nameParts.length > 1) shapeFieldsToSync.lastname = nameParts.slice(1).join(' ');
+    }
+    if (callData.email) {
+      shapeFieldsToSync.email = callData.email;
+    }
+
+    let shapeSync = { skipped: true, reason: 'No fields to sync' };
+    if (Object.keys(shapeFieldsToSync).length > 0) {
+      shapeSync = await updateShapeLeadFields(callData.shapeLeadId, shapeFieldsToSync);
+    }
+
     return sendJson(res, 200, {
       lead_id: lead.lead_id,
       transcript_id: transcript.transcript_id,
@@ -134,6 +155,7 @@ export default async function handler(req, res) {
       formatted_phone: callData.phoneNumber,
       current_status_label: lead.current_status_label,
       current_status_color: lead.current_status_color,
+      shape_sync: shapeSync,
     });
   } catch (error) {
     console.error('[call-answered] failed:', error);
