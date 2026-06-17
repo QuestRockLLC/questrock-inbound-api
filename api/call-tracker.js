@@ -1,0 +1,31 @@
+import { getSupabaseClient } from '../lib/supabase.js';
+import { assertInboundSession } from '../lib/request-auth.js';
+import { sendJson } from '../lib/http.js';
+import { listInboundCalls } from '../lib/call-tracker/list-calls.js';
+
+export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', 'GET');
+    return sendJson(res, 405, { ok: false, error: 'Method not allowed.' });
+  }
+
+  try {
+    assertInboundSession(req, { requireCallTracker: true });
+
+    const channel = String(req.query?.channel ?? '').trim().toLowerCase() || null;
+    const hours = Number(req.query?.hours ?? 168);
+    const limit = Number(req.query?.limit ?? 80);
+
+    const result = await listInboundCalls(getSupabaseClient(), {
+      channel: channel === 'questmail' || channel === 'inbound_zoom' ? channel : null,
+      hours: Number.isFinite(hours) ? hours : 168,
+      limit: Number.isFinite(limit) ? limit : 80,
+    });
+
+    return sendJson(res, 200, { ok: true, ...result });
+  } catch (error) {
+    const statusCode = error.statusCode ?? 500;
+    const message = statusCode === 500 ? 'Internal Server Error' : error.message ?? 'Request failed';
+    return sendJson(res, statusCode, { ok: false, error: message });
+  }
+}

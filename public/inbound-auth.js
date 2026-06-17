@@ -17,6 +17,10 @@ window.InboundAuth = {
       location.href = '/mailer-lo/';
       return null;
     }
+    if (options.requireCallTracker && !user.canAccessCallTracker) {
+      location.href = user.isAdmin ? '/mailer-import/' : '/mailer-lo/';
+      return null;
+    }
     return user;
   },
 

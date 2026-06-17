@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QuestRock — Call Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Playfair+Display:wght@600&display=swap"
+      rel="stylesheet"
+    />
+    <script src="/inbound-auth.js"></script>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --card: #1e293b;
+        --ink: #f8fafc;
+        --muted: #94a3b8;
+        --border: #334155;
+        --questmail: #f59e0b;
+        --inbound: #38bdf8;
+        --accent: #4ade80;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: 'DM Sans', system-ui, sans-serif;
+        background: radial-gradient(circle at top, #1e3a5f 0%, var(--bg) 45%);
+        color: var(--ink);
+        min-height: 100vh;
+      }
+      .wrap { max-width: 1200px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1.25rem;
+      }
+      h1 {
+        font-family: 'Playfair Display', Georgia, serif;
+        margin: 0 0 0.25rem;
+        font-size: 1.75rem;
+      }
+      .sub { color: var(--muted); margin: 0; font-size: 0.95rem; }
+      nav a {
+        color: var(--muted);
+        text-decoration: none;
+        margin-left: 1rem;
+        font-size: 0.9rem;
+      }
+      nav a:hover { color: var(--ink); }
+      .toolbar {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+      }
+      button, .btn {
+        background: var(--card);
+        border: 1px solid var(--border);
+        color: var(--ink);
+        border-radius: 999px;
+        padding: 0.45rem 0.9rem;
+        font: inherit;
+        cursor: pointer;
+      }
+      button.active { background: #334155; border-color: #64748b; }
+      button.primary { background: var(--accent); color: #052e16; border-color: transparent; font-weight: 600; }
+      .meta { color: var(--muted); font-size: 0.85rem; margin-bottom: 1rem; }
+      .list { display: grid; gap: 0.75rem; }
+      .call {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1rem 1.1rem;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.75rem 1rem;
+      }
+      .call h2 { margin: 0 0 0.25rem; font-size: 1.05rem; }
+      .phone { color: var(--muted); font-size: 0.9rem; }
+      .badge {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        margin-right: 0.35rem;
+      }
+      .badge.questmail { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
+      .badge.inbound { background: rgba(56, 189, 248, 0.15); color: #7dd3fc; }
+      .badge.status { background: rgba(74, 222, 128, 0.15); color: #86efac; }
+      .badge.pending { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+      .details { color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
+      .links { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.5rem; }
+      .links a { color: #7dd3fc; font-size: 0.85rem; }
+      .time { color: var(--muted); font-size: 0.82rem; white-space: nowrap; text-align: right; }
+      .empty { color: var(--muted); padding: 2rem; text-align: center; }
+      #user-pill {
+        font-size: 0.82rem;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0.3rem 0.7rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <div>
+          <h1>Call Tracker</h1>
+          <p class="sub">Live inbound + QuestMail calls · Arsalan &amp; Nikk admin view</p>
+        </div>
+        <div style="text-align:right">
+          <span id="user-pill"></span>
+          <nav>
+            <a href="/mailer-import/">Import</a>
+            <a href="/mailer-lo/">LO Desk</a>
+            <a href="/shape-archive/">Archive</a>
+            <a href="#" id="sign-out">Sign out</a>
+          </nav>
+        </div>
+      </header>
+
+      <div class="toolbar">
+        <button type="button" class="filter active" data-channel="">All calls</button>
+        <button type="button" class="filter" data-channel="questmail">QuestMail</button>
+        <button type="button" class="filter" data-channel="inbound_zoom">Inbound ads</button>
+        <button type="button" class="filter" data-hours="24">24h</button>
+        <button type="button" class="filter" data-hours="168">7 days</button>
+        <button type="button" id="refresh" class="primary">Refresh</button>
+      </div>
+      <p class="meta" id="meta">Loading…</p>
+      <div class="list" id="list"></div>
+    </div>
+
+    <script>
+      let channel = '';
+      let hours = 168;
+
+      function fmtTime(iso) {
+        if (!iso) return '—';
+        return new Date(iso).toLocaleString('en-US', {
+          timeZone: 'America/New_York',
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        });
+      }
+
+      function badgeClass(channel) {
+        return channel === 'questmail' ? 'questmail' : 'inbound';
+      }
+
+      function renderCall(c) {
+        const statusBadge = c.ai_status_label
+          ? `<span class="badge status">${c.ai_status_label}</span>`
+          : `<span class="badge pending">${c.transcript_state === 'pending' ? 'Awaiting transcript' : 'Processing'}</span>`;
+
+        const links = [];
+        if (c.shape_url) links.push(`<a href="${c.shape_url}" target="_blank" rel="noopener">Shape #${c.shape_lead_id}</a>`);
+        if (c.mailer_desk_url) links.push(`<a href="${c.mailer_desk_url}">Offer ${c.reference_code}</a>`);
+
+        return `<article class="call">
+          <div>
+            <span class="badge ${badgeClass(c.call_channel)}">${c.channel_label}</span>
+            ${statusBadge}
+            <h2>${c.borrower_name}</h2>
+            <div class="phone">${c.phone || 'No phone'}</div>
+            <div class="details">
+              LO: <strong>${c.lo_name || 'Unassigned'}</strong>
+              ${c.contact_found ? ' · Existing lead' : ' · New lead'}
+              ${c.reference_code ? ` · Code ${c.reference_code}` : ''}
+            </div>
+            ${links.length ? `<div class="links">${links.join('')}</div>` : ''}
+          </div>
+          <div class="time">${fmtTime(c.answered_at)} ET</div>
+        </article>`;
+      }
+
+      async function load() {
+        const params = new URLSearchParams({ hours: String(hours), limit: '100' });
+        if (channel) params.set('channel', channel);
+        const data = await InboundAuth.apiGet(`/api/call-tracker?${params}`);
+        const list = document.getElementById('list');
+        document.getElementById('meta').textContent =
+          `${data.count} call(s) · last ${hours === 24 ? '24 hours' : '7 days'} · updated ${fmtTime(data.generated_at)} ET`;
+        if (!data.calls?.length) {
+          list.innerHTML = '<p class="empty">No calls in this window yet.</p>';
+          return;
+        }
+        list.innerHTML = data.calls.map(renderCall).join('');
+      }
+
+      document.querySelectorAll('.filter[data-channel]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter[data-channel]').forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
+          channel = btn.dataset.channel || '';
+          load().catch((e) => alert(e.message));
+        });
+      });
+
+      document.querySelectorAll('.filter[data-hours]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          hours = Number(btn.dataset.hours);
+          load().catch((e) => alert(e.message));
+        });
+      });
+
+      document.getElementById('refresh').addEventListener('click', () => load().catch((e) => alert(e.message)));
+      document.getElementById('sign-out').addEventListener('click', (e) => {
+        e.preventDefault();
+        InboundAuth.signOut();
+      });
+
+      (async () => {
+        const user = await InboundAuth.requireAuth({ requireCallTracker: true });
+        if (!user) return;
+        document.getElementById('user-pill').textContent = user.email;
+        await load();
+        setInterval(() => load().catch(() => {}), 30000);
+      })();
+    </script>
+  </body>
+</html>

@@ -1,4 +1,5 @@
 import { getInboundSession } from '../lib/request-auth.js';
+import { canAccessCallTracker } from '../lib/inbound-access.js';
 import { sendJson } from '../lib/http.js';
 
 export default async function handler(req, res) {
@@ -15,12 +16,15 @@ export default async function handler(req, res) {
   const email = session.email;
   const name = session.name || email.split('@')[0];
 
+  const callTracker = canAccessCallTracker(email);
+
   return sendJson(res, 200, {
     ok: true,
     email,
     name,
     isAdmin: Boolean(session.isAdmin),
+    canAccessCallTracker: callTracker,
     loName: session.loName || '',
-    redirectTo: session.isAdmin ? '/mailer-import/' : '/mailer-lo/',
+    redirectTo: callTracker ? '/call-tracker/' : session.isAdmin ? '/mailer-import/' : '/mailer-lo/',
   });
 }

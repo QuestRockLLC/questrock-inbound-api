@@ -1,5 +1,5 @@
 import { fetchHubUserFromToken } from '../lib/hub-auth.js';
-import { buildInboundUserProfile } from '../lib/inbound-access.js';
+import { buildInboundUserProfile, canAccessCallTracker } from '../lib/inbound-access.js';
 import { sessionCookieHeader, signSession } from '../lib/session.js';
 
 export default async function handler(req, res) {
@@ -47,6 +47,8 @@ export default async function handler(req, res) {
   if (nextPath.startsWith('/') && !nextPath.startsWith('//')) {
     if (nextPath.startsWith('/mailer-import/') && !profile.isAdmin) {
       destination = '/mailer-lo/';
+    } else if (nextPath.startsWith('/call-tracker/') && !canAccessCallTracker(profile.email)) {
+      destination = profile.defaultPath;
     } else {
       destination = nextPath;
     }
