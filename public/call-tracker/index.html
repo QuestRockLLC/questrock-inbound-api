@@ -168,6 +168,30 @@
         font-size: 0.85rem;
         margin-left: 0.35rem;
       }
+      .refetch-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        margin-top: 0.5rem;
+      }
+      button.refetch {
+        background: rgba(56, 189, 248, 0.12);
+        border-color: rgba(56, 189, 248, 0.35);
+        color: #7dd3fc;
+        font-size: 0.82rem;
+        padding: 0.35rem 0.75rem;
+      }
+      button.refetch:disabled {
+        opacity: 0.55;
+        cursor: wait;
+      }
+      .refetch-msg {
+        font-size: 0.82rem;
+        color: var(--muted);
+      }
+      .refetch-msg.ok { color: #86efac; }
+      .refetch-msg.err { color: #fca5a5; }
     </style>
   </head>
   <body>
@@ -274,11 +298,19 @@
           ? `<section><h3>Ops notes</h3><div class="note-block"><p>${esc(c.ops_notes)}</p></div></section>`
           : '';
 
+        const needsRefetch = !c.transcript_text && (c.transcript_state === 'pending' || c.transcript_state === 'processing');
+        const refetchBlock = needsRefetch
+          ? `<div class="refetch-row">
+              <button type="button" class="refetch" data-call-id="${esc(c.call_id)}">Re-fetch from Zoom</button>
+              <span class="refetch-msg" data-refetch-msg="${esc(c.call_id)}"></span>
+            </div>`
+          : '';
+
         const transcript = c.transcript_text
           ? `<section><h3>Transcript</h3><pre>${esc(c.transcript_text)}</pre></section>`
           : c.transcript_state !== 'pending'
-            ? `<section><h3>Transcript</h3><p class="details">Still processing…</p></section>`
-            : `<section><h3>Transcript</h3><p class="details">Not received yet — usually ~5–10 min after the call.</p></section>`;
+            ? `<section><h3>Transcript</h3><p class="details">Still processing…</p>${refetchBlock}</section>`
+            : `<section><h3>Transcript</h3><p class="details">Not received yet — usually ~5–10 min after the call. If it stays stuck, pull it from Zoom.</p>${refetchBlock}</section>`;
 
         const isOpen = openCallId === c.call_id;
 
@@ -326,6 +358,41 @@
         });
       }
 
+      function bindRefetchHandlers() {
+        document.querySelectorAll('button.refetch').forEach((btn) => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const callId = btn.dataset.callId;
+            const msg = document.querySelector(`[data-refetch-msg="${callId}"]`);
+            btn.disabled = true;
+            if (msg) {
+              msg.textContent = 'Pulling from Zoom…';
+              msg.className = 'refetch-msg';
+            }
+            try {
+              const data = await InboundAuth.apiPost('/api/call-tracker-refetch', { call_id: callId });
+              if (msg) {
+                msg.textContent = data.skipped
+                  ? data.message || 'Already saved.'
+                  : `Done — ${data.ai_status_label || 'processed'}.`;
+                msg.className = 'refetch-msg ok';
+              }
+              await load();
+              openCallId = callId;
+              document.querySelectorAll('.call').forEach((el) => {
+                el.classList.toggle('open', el.dataset.callId === openCallId);
+              });
+            } catch (err) {
+              if (msg) {
+                msg.textContent = err.message || 'Re-fetch failed.';
+                msg.className = 'refetch-msg err';
+              }
+              btn.disabled = false;
+            }
+          });
+        });
+      }
+
       async function load() {
         const params = new URLSearchParams({ hours: String(hours), limit: '100' });
         if (channel) params.set('channel', channel);
@@ -340,6 +407,7 @@
         }
         list.innerHTML = data.calls.map(renderCall).join('');
         bindExpandHandlers();
+        bindRefetchHandlers();
       }
 
       document.querySelectorAll('.filter[data-channel]').forEach((btn) => {
