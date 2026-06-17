@@ -13,11 +13,13 @@ export default async function handler(req, res) {
     assertInboundSession(req, { requireCallTracker: true });
 
     const channel = String(req.query?.channel ?? '').trim().toLowerCase() || null;
+    const state = String(req.query?.state ?? '').trim().toUpperCase() || null;
     const hours = Number(req.query?.hours ?? 168);
     const limit = Number(req.query?.limit ?? 80);
 
     const result = await listInboundCalls(getSupabaseClient(), {
       channel: channel === 'questmail' || channel === 'inbound_zoom' ? channel : null,
+      state: state && state.length === 2 ? state : null,
       hours: Number.isFinite(hours) ? hours : 168,
       limit: Number.isFinite(limit) ? limit : 80,
     });

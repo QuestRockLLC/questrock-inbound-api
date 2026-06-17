@@ -19,6 +19,7 @@
         --border: #334155;
         --questmail: #f59e0b;
         --inbound: #38bdf8;
+        --landing: #a78bfa;
         --accent: #4ade80;
       }
       * { box-sizing: border-box; }
@@ -51,11 +52,19 @@
         font-size: 0.9rem;
       }
       nav a:hover { color: var(--ink); }
-      .toolbar {
+      .toolbar, .state-bar {
         display: flex;
         gap: 0.5rem;
         flex-wrap: wrap;
-        margin-bottom: 1rem;
+        margin-bottom: 0.75rem;
+      }
+      .state-bar label {
+        width: 100%;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin: 0.25rem 0 0;
       }
       button, .btn {
         background: var(--card);
@@ -74,11 +83,16 @@
         background: var(--card);
         border: 1px solid var(--border);
         border-radius: 12px;
+        overflow: hidden;
+      }
+      .call-head {
         padding: 1rem 1.1rem;
         display: grid;
         grid-template-columns: 1fr auto;
         gap: 0.75rem 1rem;
+        cursor: pointer;
       }
+      .call-head:hover { background: rgba(255,255,255,0.02); }
       .call h2 { margin: 0 0 0.25rem; font-size: 1.05rem; }
       .phone { color: var(--muted); font-size: 0.9rem; }
       .badge {
@@ -90,9 +104,11 @@
         padding: 0.2rem 0.55rem;
         border-radius: 999px;
         margin-right: 0.35rem;
+        margin-bottom: 0.25rem;
       }
       .badge.questmail { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
       .badge.inbound { background: rgba(56, 189, 248, 0.15); color: #7dd3fc; }
+      .badge.landing { background: rgba(167, 139, 250, 0.2); color: #c4b5fd; }
       .badge.status { background: rgba(74, 222, 128, 0.15); color: #86efac; }
       .badge.pending { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
       .details { color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
@@ -107,6 +123,51 @@
         border-radius: 999px;
         padding: 0.3rem 0.7rem;
       }
+      .call-body {
+        display: none;
+        border-top: 1px solid var(--border);
+        padding: 0 1.1rem 1rem;
+        background: rgba(0,0,0,0.15);
+      }
+      .call.open .call-body { display: block; }
+      .call-body section { margin-top: 1rem; }
+      .call-body h3 {
+        margin: 0 0 0.4rem;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+      .call-body p, .call-body pre {
+        margin: 0;
+        font-size: 0.88rem;
+        line-height: 1.55;
+        color: #e2e8f0;
+      }
+      .call-body pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #0f172a;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.75rem;
+        max-height: 280px;
+        overflow: auto;
+        font-family: ui-monospace, monospace;
+        font-size: 0.8rem;
+      }
+      .note-block {
+        background: #0f172a;
+        border-left: 3px solid #38bdf8;
+        border-radius: 0 8px 8px 0;
+        padding: 0.65rem 0.85rem;
+        margin-top: 0.35rem;
+      }
+      .chevron {
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin-left: 0.35rem;
+      }
     </style>
   </head>
   <body>
@@ -114,7 +175,7 @@
       <header>
         <div>
           <h1>Call Tracker</h1>
-          <p class="sub">Live inbound + QuestMail calls · Arsalan &amp; Nikk admin view</p>
+          <p class="sub">Transcripts · AI status · landing page / UTM · Arsalan &amp; Nikk</p>
         </div>
         <div style="text-align:right">
           <span id="user-pill"></span>
@@ -135,13 +196,27 @@
         <button type="button" class="filter" data-hours="168">7 days</button>
         <button type="button" id="refresh" class="primary">Refresh</button>
       </div>
+
+      <div class="state-bar">
+        <label>Landing page / UTM state</label>
+        <button type="button" class="state-filter active" data-state="">All states</button>
+        <button type="button" class="state-filter" data-state="FL">FL</button>
+        <button type="button" class="state-filter" data-state="GA">GA</button>
+        <button type="button" class="state-filter" data-state="NC">NC</button>
+        <button type="button" class="state-filter" data-state="SC">SC</button>
+        <button type="button" class="state-filter" data-state="TN">TN</button>
+        <button type="button" class="state-filter" data-state="TX">TX</button>
+      </div>
+
       <p class="meta" id="meta">Loading…</p>
       <div class="list" id="list"></div>
     </div>
 
     <script>
       let channel = '';
+      let state = '';
       let hours = 168;
+      let openCallId = null;
 
       function fmtTime(iso) {
         if (!iso) return '—';
@@ -154,48 +229,117 @@
         });
       }
 
-      function badgeClass(channel) {
-        return channel === 'questmail' ? 'questmail' : 'inbound';
+      function esc(s) {
+        return String(s ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function badgeClass(c) {
+        if (c.call_channel === 'questmail') return 'questmail';
+        if (c.landing_page_label) return 'landing';
+        return 'inbound';
       }
 
       function renderCall(c) {
         const statusBadge = c.ai_status_label
-          ? `<span class="badge status">${c.ai_status_label}</span>`
+          ? `<span class="badge status">${esc(c.ai_status_label)}</span>`
           : `<span class="badge pending">${c.transcript_state === 'pending' ? 'Awaiting transcript' : 'Processing'}</span>`;
 
-        const links = [];
-        if (c.shape_url) links.push(`<a href="${c.shape_url}" target="_blank" rel="noopener">Shape #${c.shape_lead_id}</a>`);
-        if (c.mailer_desk_url) links.push(`<a href="${c.mailer_desk_url}">Offer ${c.reference_code}</a>`);
+        const landingBadge = c.landing_page_label
+          ? `<span class="badge landing">${esc(c.landing_page_label)}</span>`
+          : '';
 
-        return `<article class="call">
-          <div>
-            <span class="badge ${badgeClass(c.call_channel)}">${c.channel_label}</span>
-            ${statusBadge}
-            <h2>${c.borrower_name}</h2>
-            <div class="phone">${c.phone || 'No phone'}</div>
-            <div class="details">
-              LO: <strong>${c.lo_name || 'Unassigned'}</strong>
-              ${c.contact_found ? ' · Existing lead' : ' · New lead'}
-              ${c.reference_code ? ` · Code ${c.reference_code}` : ''}
+        const utm = c.utm_campaign ? ` · UTM ${esc(c.utm_campaign)}` : '';
+        const dialed = c.dialed_number_display ? ` · Dialed ${esc(c.dialed_number_display)}` : '';
+
+        const links = [];
+        if (c.shape_url) links.push(`<a href="${c.shape_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Shape #${c.shape_lead_id}</a>`);
+        if (c.mailer_desk_url) links.push(`<a href="${c.mailer_desk_url}" onclick="event.stopPropagation()">Offer ${esc(c.reference_code)}</a>`);
+
+        const summary = c.call_summary
+          ? `<section><h3>AI summary</h3><div class="note-block"><p>${esc(c.call_summary)}</p></div></section>`
+          : '';
+
+        const rationale = c.status_rationale
+          ? `<section><h3>Why this status</h3><p>${esc(c.status_rationale)}</p></section>`
+          : '';
+
+        const sales = c.sales_notes
+          ? `<section><h3>Sales notes (LO / AI)</h3><div class="note-block"><p>${esc(c.sales_notes)}</p></div></section>`
+          : '';
+
+        const ops = c.ops_notes
+          ? `<section><h3>Ops notes</h3><div class="note-block"><p>${esc(c.ops_notes)}</p></div></section>`
+          : '';
+
+        const transcript = c.transcript_text
+          ? `<section><h3>Transcript</h3><pre>${esc(c.transcript_text)}</pre></section>`
+          : c.transcript_state !== 'pending'
+            ? `<section><h3>Transcript</h3><p class="details">Still processing…</p></section>`
+            : `<section><h3>Transcript</h3><p class="details">Not received yet — usually ~5–10 min after the call.</p></section>`;
+
+        const isOpen = openCallId === c.call_id;
+
+        return `<article class="call${isOpen ? ' open' : ''}" data-call-id="${esc(c.call_id)}">
+          <div class="call-head" role="button" tabindex="0">
+            <div>
+              <span class="badge ${badgeClass(c)}">${esc(c.channel_label)}</span>
+              ${landingBadge}
+              ${statusBadge}
+              <h2>${esc(c.borrower_name)} <span class="chevron">${isOpen ? '▾' : '▸'}</span></h2>
+              <div class="phone">${esc(c.phone || 'No phone')}</div>
+              <div class="details">
+                LO: <strong>${esc(c.lo_name || 'Unassigned')}</strong>
+                ${c.contact_found ? ' · Existing lead' : ' · New lead'}
+                ${c.reference_code ? ` · Code ${esc(c.reference_code)}` : ''}
+                ${utm}${dialed}
+                ${c.lead_status_label ? ` · Shape: ${esc(c.lead_status_label)}` : ''}
+              </div>
+              ${links.length ? `<div class="links">${links.join('')}</div>` : ''}
             </div>
-            ${links.length ? `<div class="links">${links.join('')}</div>` : ''}
+            <div class="time">${fmtTime(c.answered_at)} ET</div>
           </div>
-          <div class="time">${fmtTime(c.answered_at)} ET</div>
+          <div class="call-body">
+            ${summary}
+            ${rationale}
+            ${sales}
+            ${ops}
+            ${transcript}
+          </div>
         </article>`;
+      }
+
+      function bindExpandHandlers() {
+        document.querySelectorAll('.call-head').forEach((head) => {
+          head.addEventListener('click', () => {
+            const article = head.closest('.call');
+            const id = article?.dataset.callId;
+            openCallId = openCallId === id ? null : id;
+            document.querySelectorAll('.call').forEach((el) => {
+              el.classList.toggle('open', el.dataset.callId === openCallId);
+              const chev = el.querySelector('.chevron');
+              if (chev) chev.textContent = el.dataset.callId === openCallId ? '▾' : '▸';
+            });
+          });
+        });
       }
 
       async function load() {
         const params = new URLSearchParams({ hours: String(hours), limit: '100' });
         if (channel) params.set('channel', channel);
+        if (state) params.set('state', state);
         const data = await InboundAuth.apiGet(`/api/call-tracker?${params}`);
         const list = document.getElementById('list');
         document.getElementById('meta').textContent =
-          `${data.count} call(s) · last ${hours === 24 ? '24 hours' : '7 days'} · updated ${fmtTime(data.generated_at)} ET`;
+          `${data.count} call(s) · last ${hours === 24 ? '24 hours' : '7 days'}${state ? ` · ${state} landing` : ''} · updated ${fmtTime(data.generated_at)} ET`;
         if (!data.calls?.length) {
           list.innerHTML = '<p class="empty">No calls in this window yet.</p>';
           return;
         }
         list.innerHTML = data.calls.map(renderCall).join('');
+        bindExpandHandlers();
       }
 
       document.querySelectorAll('.filter[data-channel]').forEach((btn) => {
@@ -203,6 +347,15 @@
           document.querySelectorAll('.filter[data-channel]').forEach((b) => b.classList.remove('active'));
           btn.classList.add('active');
           channel = btn.dataset.channel || '';
+          load().catch((e) => alert(e.message));
+        });
+      });
+
+      document.querySelectorAll('.state-filter').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.state-filter').forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
+          state = btn.dataset.state || '';
           load().catch((e) => alert(e.message));
         });
       });
