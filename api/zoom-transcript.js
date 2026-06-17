@@ -1,13 +1,18 @@
 import { waitUntil } from '@vercel/functions';
 import { getSupabaseClient } from '../lib/supabase.js';
 import { findLeadByShapeId } from '../lib/leads.js';
-import { appendTranscript, getTranscriptHistory } from '../lib/transcripts.js';
+import { appendTranscript } from '../lib/transcripts.js';
 import {
   processTranscriptPipeline,
   runBackgroundTranscriptJob,
 } from '../lib/process-transcript-pipeline.js';
 import { assertAuthorized, normalizePayload, readJsonBody, sendJson } from '../lib/http.js';
 import { resolveLeadPhone } from '../lib/zoom-payload.js';
+import { handleZoomWebhookChallenge } from '../lib/zoom/webhook.js';
+import {
+  isZoomRecordingPayload,
+  runTranscriptIngestPipeline,
+} from '../lib/transcript-ingest-pipeline.js';
 
 function parseTranscriptPayload(body) {
   const normalized = normalizePayload(body);
@@ -57,9 +62,6 @@ function parseTranscriptPayload(body) {
   };
 }
 
-/**
- * Saves transcript row quickly for async mode (deduped by external_call_id).
- */
 async function ingestTranscriptOnly(payload) {
   const supabase = getSupabaseClient();
   const lead = await findLeadByShapeId(supabase, payload.shapeLeadId);
@@ -86,8 +88,12 @@ async function ingestTranscriptOnly(payload) {
 }
 
 /**
- * Zoom transcript webhook handler.
- * Default async=true returns in ~2s; AI + Shape + notify run in background (avoids Zapier 30s timeout).
+ * Zoom transcript handler.
+ *
+ * **Full pipeline** (default for `recording.completed` webhook):
+ * Fetch transcript from Zoom API → resolve lead by call_id → AI + Shape sync + email.
+ *
+ * **Legacy** (flat body with shape_lead_id + transcript_text): unchanged behavior.
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -96,9 +102,35 @@ export default async function handler(req, res) {
   }
 
   try {
+    const body = readJsonBody(req);
+
+    const challenge = handleZoomWebhookChallenge(body, req);
+    if (challenge) {
+      return sendJson(res, 200, challenge);
+    }
+
     assertAuthorized(req);
 
-    const body = readJsonBody(req);
+    if (isZoomRecordingPayload(body)) {
+      const ingest = await runTranscriptIngestPipeline(getSupabaseClient(), body, { asyncMode: true });
+
+      if (ingest.retry) {
+        return sendJson(res, 202, ingest);
+      }
+
+      if (ingest.pipeline_payload) {
+        const jobPayload = ingest.pipeline_payload;
+        waitUntil(
+          runBackgroundTranscriptJob(jobPayload).catch((error) => {
+            console.error('[zoom-transcript] waitUntil failed:', error);
+          }),
+        );
+        delete ingest.pipeline_payload;
+      }
+
+      return sendJson(res, ingest.async ? 202 : 200, ingest);
+    }
+
     const payload = parseTranscriptPayload(body);
 
     if (payload.asyncMode) {
@@ -113,8 +145,8 @@ export default async function handler(req, res) {
       return sendJson(res, 202, {
         accepted: true,
         async: true,
-        message:
-          'Transcript queued for AI processing. Admin email fires via ZAPIER_ADMIN_NOTIFY_WEBHOOK_URL when complete.',
+        pipeline: 'legacy',
+        message: 'Transcript queued for AI processing.',
         lead_id: lead.lead_id,
         transcript_id: transcript.transcript_id,
         shape_lead_id: payload.shapeLeadId,
@@ -123,7 +155,7 @@ export default async function handler(req, res) {
     }
 
     const result = await processTranscriptPipeline(payload);
-    return sendJson(res, 200, result);
+    return sendJson(res, 200, { pipeline: 'legacy', ...result });
   } catch (error) {
     console.error('[zoom-transcript] failed:', error);
 
@@ -131,7 +163,7 @@ export default async function handler(req, res) {
     const message =
       statusCode === 500 ? 'Internal Server Error' : error.message ?? 'Request failed';
 
-    return sendJson(res, statusCode, { error: message });
+    return sendJson(res, statusCode, { error: message, details: error.details ?? undefined });
   }
 }
 

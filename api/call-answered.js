@@ -1,13 +1,15 @@
 import { getSupabaseClient } from '../lib/supabase.js';
 import { upsertLeadFromShapeCall } from '../lib/leads.js';
 import { insertInitialCallTranscript } from '../lib/transcripts.js';
-import { assertAuthorized, normalizePayload, readJsonBody, sendJson } from '../lib/http.js';
-import { resolveLeadPhone } from '../lib/zoom-payload.js';
+import { assertAuthorized, readJsonBody, sendJson } from '../lib/http.js';
 import { updateShapeLeadFields } from '../lib/shape/client.js';
+import { normalizePayload, resolveLeadPhone } from '../lib/zoom-payload.js';
 import {
   isZoomCallAnsweredPayload,
   runCallAnsweredPipeline,
 } from '../lib/call-answered-pipeline.js';
+import { handleZoomWebhookChallenge } from '../lib/zoom/webhook.js';
+import { sendEmail } from '../lib/email/send.js';
 
 function parseCallAnsweredPayload(body) {
   const normalized = normalizePayload(body);
@@ -150,13 +152,7 @@ async function runLegacyCallAnswered(supabase, body) {
 }
 
 /**
- * Call answered handler.
- *
- * **Full pipeline** (default for raw Zoom `phone.callee_answered` webhooks):
- * Shape search → create if missing → assign LO owner → Supabase → disposition email payload.
- *
- * **Legacy pipeline** (when `shape_lead_id` is already set by Zapier):
- * Supabase upsert + field sync only.
+ * Call answered — direct from Zoom `phone.callee_answered` or legacy Zapier flat body.
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -165,14 +161,31 @@ export default async function handler(req, res) {
   }
 
   try {
+    const body = readJsonBody(req);
+
+    const challenge = handleZoomWebhookChallenge(body, req);
+    if (challenge) {
+      return sendJson(res, 200, challenge);
+    }
+
     assertAuthorized(req);
 
-    const body = readJsonBody(req);
     const supabase = getSupabaseClient();
 
     if (isZoomCallAnsweredPayload(body)) {
       const result = await runCallAnsweredPipeline(supabase, body);
-      return sendJson(res, 200, result);
+
+      let dispositionSend = { sent: false, reason: 'No disposition email built' };
+      const disposition = result.disposition_email;
+      if (disposition?.email_to && !result.skipped) {
+        dispositionSend = await sendEmail({
+          to: disposition.email_to,
+          subject: disposition.email_subject,
+          html: disposition.email_html,
+        });
+      }
+
+      return sendJson(res, 200, { ...result, disposition_send: dispositionSend });
     }
 
     const result = await runLegacyCallAnswered(supabase, body);
@@ -190,3 +203,7 @@ export default async function handler(req, res) {
     });
   }
 }
+
+export const config = {
+  maxDuration: 60,
+};
