@@ -4,6 +4,10 @@ import { insertInitialCallTranscript } from '../lib/transcripts.js';
 import { assertAuthorized, normalizePayload, readJsonBody, sendJson } from '../lib/http.js';
 import { resolveLeadPhone } from '../lib/zoom-payload.js';
 import { updateShapeLeadFields } from '../lib/shape/client.js';
+import {
+  isZoomCallAnsweredPayload,
+  runCallAnsweredPipeline,
+} from '../lib/call-answered-pipeline.js';
 
 function parseCallAnsweredPayload(body) {
   const normalized = normalizePayload(body);
@@ -91,9 +95,68 @@ function parseCallAnsweredPayload(body) {
   };
 }
 
+async function runLegacyCallAnswered(supabase, body) {
+  const callData = parseCallAnsweredPayload(body);
+
+  const { lead, created, mailerMatched } = await upsertLeadFromShapeCall(supabase, {
+    shapeLeadId: callData.shapeLeadId,
+    fullName: callData.fullName,
+    phoneNumber: callData.phoneNumber,
+    email: callData.email,
+    currentAddress: callData.currentAddress,
+    city: callData.city,
+    state: callData.state,
+    zipCode: callData.zipCode,
+    companyName: callData.companyName,
+  });
+
+  const { transcript, created: transcriptCreated } = await insertInitialCallTranscript(supabase, {
+    lead,
+    externalCallId: callData.callId,
+    timestamp: callData.timestamp,
+  });
+
+  const shapeFieldsToSync = {};
+  if (callData.phoneNumber) {
+    shapeFieldsToSync.phone = callData.phoneNumber;
+  }
+  if (callData.fullName) {
+    const nameParts = callData.fullName.trim().split(/\s+/);
+    if (nameParts[0]) shapeFieldsToSync.firstname = nameParts[0];
+    if (nameParts.length > 1) shapeFieldsToSync.lastname = nameParts.slice(1).join(' ');
+  }
+  if (callData.email) {
+    shapeFieldsToSync.email = callData.email;
+  }
+
+  let shapeSync = { skipped: true, reason: 'No fields to sync' };
+  if (Object.keys(shapeFieldsToSync).length > 0) {
+    shapeSync = await updateShapeLeadFields(callData.shapeLeadId, shapeFieldsToSync);
+  }
+
+  return {
+    pipeline: 'legacy',
+    lead_id: lead.lead_id,
+    transcript_id: transcript.transcript_id,
+    shape_lead_id: callData.shapeLeadId,
+    lead_created: created,
+    transcript_created: transcriptCreated,
+    formatted_phone: callData.phoneNumber,
+    current_status_label: lead.current_status_label,
+    current_status_color: lead.current_status_color,
+    shape_sync: shapeSync,
+    mailer_matched: mailerMatched ?? null,
+  };
+}
+
 /**
- * Shape-first call answered handler.
- * Run AFTER Shape search/create + assign owner in Zapier.
+ * Call answered handler.
+ *
+ * **Full pipeline** (default for raw Zoom `phone.callee_answered` webhooks):
+ * Shape search → create if missing → assign LO owner → Supabase → disposition email payload.
+ *
+ * **Legacy pipeline** (when `shape_lead_id` is already set by Zapier):
+ * Supabase upsert + field sync only.
  */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -105,59 +168,15 @@ export default async function handler(req, res) {
     assertAuthorized(req);
 
     const body = readJsonBody(req);
-    const callData = parseCallAnsweredPayload(body);
     const supabase = getSupabaseClient();
 
-    const { lead, created, mailerMatched } = await upsertLeadFromShapeCall(supabase, {
-      shapeLeadId: callData.shapeLeadId,
-      fullName: callData.fullName,
-      phoneNumber: callData.phoneNumber,
-      email: callData.email,
-      currentAddress: callData.currentAddress,
-      city: callData.city,
-      state: callData.state,
-      zipCode: callData.zipCode,
-      companyName: callData.companyName,
-    });
-
-    const { transcript, created: transcriptCreated } = await insertInitialCallTranscript(supabase, {
-      lead,
-      externalCallId: callData.callId,
-      timestamp: callData.timestamp,
-    });
-
-    // Immediately push known caller fields back to Shape so the lead is
-    // always enriched with phone / name even before the transcript arrives.
-    const shapeFieldsToSync = {};
-    if (callData.phoneNumber) {
-      shapeFieldsToSync.phone = callData.phoneNumber;
-    }
-    if (callData.fullName) {
-      const nameParts = callData.fullName.trim().split(/\s+/);
-      if (nameParts[0]) shapeFieldsToSync.firstname = nameParts[0];
-      if (nameParts.length > 1) shapeFieldsToSync.lastname = nameParts.slice(1).join(' ');
-    }
-    if (callData.email) {
-      shapeFieldsToSync.email = callData.email;
+    if (isZoomCallAnsweredPayload(body)) {
+      const result = await runCallAnsweredPipeline(supabase, body);
+      return sendJson(res, 200, result);
     }
 
-    let shapeSync = { skipped: true, reason: 'No fields to sync' };
-    if (Object.keys(shapeFieldsToSync).length > 0) {
-      shapeSync = await updateShapeLeadFields(callData.shapeLeadId, shapeFieldsToSync);
-    }
-
-    return sendJson(res, 200, {
-      lead_id: lead.lead_id,
-      transcript_id: transcript.transcript_id,
-      shape_lead_id: callData.shapeLeadId,
-      lead_created: created,
-      transcript_created: transcriptCreated,
-      formatted_phone: callData.phoneNumber,
-      current_status_label: lead.current_status_label,
-      current_status_color: lead.current_status_color,
-      shape_sync: shapeSync,
-      mailer_matched: mailerMatched ?? null,
-    });
+    const result = await runLegacyCallAnswered(supabase, body);
+    return sendJson(res, 200, result);
   } catch (error) {
     console.error('[call-answered] failed:', error);
 
@@ -165,6 +184,9 @@ export default async function handler(req, res) {
     const message =
       statusCode === 500 ? 'Internal Server Error' : error.message ?? 'Request failed';
 
-    return sendJson(res, statusCode, { error: message });
+    return sendJson(res, statusCode, {
+      error: message,
+      details: error.details ?? undefined,
+    });
   }
 }
