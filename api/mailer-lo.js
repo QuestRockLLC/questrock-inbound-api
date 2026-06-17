@@ -82,8 +82,8 @@ export default async function handler(req, res) {
     try {
       const session = assertLoDeskAuthorized(req);
       const q = String(req.query?.q ?? '').trim();
-      const loName = loFilterForSession(session);
-      const results = await searchMailerLeads(getSupabaseClient(), q, { loName });
+      // Lookup desk: search all mailer leads (imports default to Concierge, not per-LO).
+      const results = await searchMailerLeads(getSupabaseClient(), q);
 
       return sendJson(res, 200, { ok: true, query: q, count: results.length, results });
     } catch (error) {
