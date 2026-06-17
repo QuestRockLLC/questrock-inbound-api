@@ -182,6 +182,12 @@ export default async function handler(req, res) {
           to: disposition.email_to,
           subject: disposition.email_subject,
           html: disposition.email_html,
+          template: 'lo_disposition',
+          meta: {
+            shape_lead_id: result.shape_lead_id,
+            call_id: result.call_id,
+            lo_email: disposition.email_to,
+          },
         });
       }
 
