@@ -1,5 +1,6 @@
 import { getSupabaseClient } from '../lib/supabase.js';
 import { assertAuthorized, sendJson } from '../lib/http.js';
+import { getZoomOAuthCredentialSets, probeZoomOAuth } from '../lib/zoom/auth.js';
 
 function supabaseProjectHost() {
   try {
@@ -19,6 +20,8 @@ export default async function handler(req, res) {
     return sendJson(res, 405, { error: 'Method Not Allowed' });
   }
 
+  const zoomCredentialSets = getZoomOAuthCredentialSets();
+
   const checks = {
     supabase_url: Boolean(process.env.SUPABASE_URL),
     supabase_service_role: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
@@ -27,6 +30,9 @@ export default async function handler(req, res) {
     hub_supabase_anon_key: Boolean(process.env.HUB_SUPABASE_ANON_KEY),
     openai_api_key: Boolean(process.env.OPENAI_API_KEY),
     supabase_project_host: supabaseProjectHost(),
+    zoom_account_id: Boolean(process.env.ZOOM_ACCOUNT_ID?.trim()),
+    zoom_oauth_sets: zoomCredentialSets.length,
+    zoom_oauth_labels: zoomCredentialSets.map((set) => set.label),
   };
 
   let supabaseOk = false;
@@ -74,6 +80,15 @@ export default async function handler(req, res) {
 
   const leadId = req.query?.lead_id;
   const shapeLeadId = req.query?.shape_lead_id;
+
+  if (req.query?.zoom_oauth === '1') {
+    try {
+      assertAuthorized(req);
+      payload.zoom_oauth = await probeZoomOAuth();
+    } catch (error) {
+      payload.zoom_oauth_error = error.message;
+    }
+  }
 
   if (leadId || shapeLeadId) {
     try {
