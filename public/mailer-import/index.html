@@ -239,7 +239,7 @@
         </div>
         <div style="display:flex;align-items:center;gap:1rem">
           <a href="/mailer-lo/" style="color:var(--accent);font-weight:600;text-decoration:none">LO Desk</a>
-          <a href="/call-tracker/" style="color:var(--accent);font-weight:600;text-decoration:none">Call Tracker</a>
+          <a href="/call-tracker/" id="call-tracker-link" style="display:none;color:var(--accent);font-weight:600;text-decoration:none">Call Tracker</a>
           <a href="/shape-archive/" style="color:var(--accent);font-weight:600;text-decoration:none">Shape Archive</a>
           <span id="user-label" class="subtitle" style="margin:0"></span>
           <button type="button" id="sign-out-btn" class="secondary" style="padding:0.45rem 0.75rem">Sign out</button>
@@ -851,6 +851,9 @@
         const user = await InboundAuth.requireAuth({ requireAdmin: true });
         if (!user) return;
         document.getElementById('user-label').textContent = user.name;
+        if (user.canAccessCallTracker) {
+          document.getElementById('call-tracker-link').style.display = '';
+        }
       })();
     </script>
   </body>
