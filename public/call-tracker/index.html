@@ -227,6 +227,13 @@
         opacity: 0.55;
         cursor: wait;
       }
+      button.secondary-analyze {
+        background: transparent;
+        border-color: var(--border);
+        color: var(--muted);
+        font-size: 0.78rem;
+        padding: 0.3rem 0.65rem;
+      }
       .refetch-msg {
         font-size: 0.82rem;
         color: var(--muted);
@@ -342,11 +349,13 @@
         const statusBadge = c.ai_status_label
           ? `<span class="badge status"${statusStyle}>${esc(c.ai_status_label)}</span>`
           : `<span class="badge pending">${
-              c.transcript_state === 'awaiting_identification'
-                ? 'QuestMail — awaiting ID'
-                : c.transcript_state === 'pending'
-                  ? 'Awaiting transcript'
-                  : 'AI processing'
+              c.transcript_state === 'needs_ai'
+                ? 'Transcript ready — run AI'
+                : c.transcript_state === 'awaiting_identification'
+                  ? 'QuestMail — awaiting ID'
+                  : c.transcript_state === 'pending'
+                    ? 'Awaiting transcript'
+                    : 'AI processing'
             }</span>`;
 
         const landingBadge = c.landing_page_label
@@ -376,13 +385,19 @@
           ? `<section><h3>Ops notes (AI)</h3><div class="note-block"><p>${esc(c.ops_notes)}</p></div></section>`
           : '';
 
-        const needsAnalyze = c.needs_ai_analysis || (c.transcript_text && !c.ai_status_label);
-        const analyzeBlock = needsAnalyze
-          ? `<div class="refetch-row">
+        const needsAnalyze = Boolean(c.needs_ai_analysis);
+        const analyzeBlock =
+          c.transcript_text && needsAnalyze
+            ? `<div class="refetch-row">
               <button type="button" class="analyze" data-call-id="${esc(c.call_id)}">Run AI summary &amp; coaching</button>
+              <span class="refetch-msg" data-analyze-msg="${esc(c.call_id)}">Transcript saved — AI analysis not run yet.</span>
+            </div>`
+            : c.transcript_text
+              ? `<div class="refetch-row">
+              <button type="button" class="analyze secondary-analyze" data-call-id="${esc(c.call_id)}">Re-run AI summary &amp; coaching</button>
               <span class="refetch-msg" data-analyze-msg="${esc(c.call_id)}"></span>
             </div>`
-          : '';
+              : '';
 
         const extracted = renderExtractedFields(c.extracted_fields);
         const shapeSync = renderShapeSync(c.shape_sync);
