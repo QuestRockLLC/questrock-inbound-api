@@ -91,6 +91,7 @@
         grid-template-columns: 1fr auto;
         gap: 0.75rem 1rem;
         cursor: pointer;
+        user-select: none;
       }
       .call-head:hover { background: rgba(255,255,255,0.02); }
       .call h2 { margin: 0 0 0.25rem; font-size: 1.05rem; }
@@ -162,9 +163,48 @@
         border-top: 1px solid var(--border);
         padding: 0 1.1rem 1rem;
         background: rgba(0,0,0,0.15);
+        user-select: text;
+        -webkit-user-select: text;
       }
       .call.open .call-body { display: block; }
       .call-body section { margin-top: 1rem; }
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin-bottom: 0.4rem;
+      }
+      .section-head h3 {
+        margin: 0;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+      .copy-actions {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+        margin: 0.75rem 0 0.25rem;
+      }
+      button.copy-btn {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 0.72rem;
+        padding: 0.25rem 0.55rem;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      button.copy-btn:hover {
+        color: var(--ink);
+        border-color: #64748b;
+      }
+      button.copy-btn.copied {
+        color: #86efac;
+        border-color: rgba(74, 222, 128, 0.45);
+      }
       .call-body h3 {
         margin: 0 0 0.4rem;
         font-size: 0.72rem;
@@ -172,30 +212,42 @@
         letter-spacing: 0.08em;
         color: var(--muted);
       }
-      .call-body p, .call-body pre {
+      .call-body p, .call-body pre, .call-body .copy-block {
         margin: 0;
         font-size: 0.88rem;
         line-height: 1.55;
         color: #e2e8f0;
+        user-select: text;
+        -webkit-user-select: text;
+        cursor: text;
       }
-      .call-body pre {
+      .copy-block, .call-body pre {
         white-space: pre-wrap;
         word-break: break-word;
         background: #0f172a;
         border: 1px solid var(--border);
         border-radius: 8px;
         padding: 0.75rem;
-        max-height: 280px;
-        overflow: auto;
         font-family: ui-monospace, monospace;
         font-size: 0.8rem;
+      }
+      .call-body pre.transcript-block {
+        max-height: 360px;
+        overflow: auto;
       }
       .note-block {
         background: #0f172a;
         border-left: 3px solid #38bdf8;
         border-radius: 0 8px 8px 0;
-        padding: 0.65rem 0.85rem;
-        margin-top: 0.35rem;
+        padding: 0;
+        margin-top: 0;
+        border: 1px solid var(--border);
+        border-left: 3px solid #38bdf8;
+      }
+      .note-block .copy-block {
+        border: none;
+        border-radius: 0 8px 8px 0;
+        background: transparent;
       }
       .chevron {
         color: var(--muted);
@@ -314,12 +366,58 @@
         return 'inbound';
       }
 
+      function copyBtn(label = 'Copy') {
+        return `<button type="button" class="copy-btn" data-copy-label="${esc(label)}">${label}</button>`;
+      }
+
+      function hiddenCopySource(id, text) {
+        if (!text) return '';
+        return `<textarea class="copy-source" id="${esc(id)}" hidden readonly aria-hidden="true">${esc(text)}</textarea>`;
+      }
+
+      function copySection(title, text) {
+        if (!text) return '';
+        return `<section class="copy-section">
+          <div class="section-head">
+            <h3>${title}</h3>
+            ${copyBtn('Copy')}
+          </div>
+          <div class="note-block"><pre class="copy-block">${esc(text)}</pre></div>
+        </section>`;
+      }
+
+      function formatExtractedFieldsText(fields) {
+        if (!fields?.length) return '';
+        return fields.map((row) => `${row.field}: ${row.value}`).join('\n');
+      }
+
+      function buildAiReviewText(c) {
+        const parts = [];
+        if (c.ai_status_label) parts.push(`Status: ${c.ai_status_label}`);
+        if (c.call_summary) parts.push(`\n--- AI Summary ---\n${c.call_summary}`);
+        if (c.status_rationale) parts.push(`\n--- Why this status ---\n${c.status_rationale}`);
+        if (c.sales_notes) parts.push(`\n--- LO Coaching ---\n${c.sales_notes}`);
+        if (c.ops_notes) parts.push(`\n--- Ops Notes ---\n${c.ops_notes}`);
+        const fieldsText = formatExtractedFieldsText(c.extracted_fields);
+        if (fieldsText) parts.push(`\n--- Extracted Shape Fields ---\n${fieldsText}`);
+        if (c.shape_sync?.message) parts.push(`\n--- Shape Sync ---\n${c.shape_sync.message}`);
+        return parts.join('\n').trim();
+      }
+
+      function buildFullCallText(c) {
+        const ai = buildAiReviewText(c);
+        const parts = [];
+        parts.push(`${c.borrower_name || 'Unknown'} · ${c.phone || 'No phone'}`);
+        if (c.lo_name) parts.push(`LO: ${c.lo_name}`);
+        if (ai) parts.push('\n' + ai);
+        if (c.transcript_text) parts.push(`\n--- Transcript ---\n${c.transcript_text}`);
+        return parts.join('\n').trim();
+      }
+
       function renderExtractedFields(fields) {
         if (!fields?.length) return '';
-        const items = fields
-          .map((row) => `<li><span class="k">${esc(row.field)}</span><span class="v">${esc(row.value)}</span></li>`)
-          .join('');
-        return `<section><h3>Extracted Shape fields (${fields.length})</h3><ul class="field-list">${items}</ul></section>`;
+        const text = formatExtractedFieldsText(fields);
+        return copySection(`Extracted Shape fields (${fields.length})`, text);
       }
 
       function renderShapeSync(sync) {
@@ -330,15 +428,13 @@
         const badgeLabel = state === 'synced' ? 'Shape synced' : state === 'skipped' ? 'Shape skipped' : 'Shape failed';
         const fields =
           sync.fields_sent?.length
-            ? `<ul class="field-list" style="margin-top:0.65rem">${sync.fields_sent
-                .map((f) => `<li><span class="k">${esc(f)}</span><span class="v">updated</span></li>`)
-                .join('')}</ul>`
+            ? `\nFields updated: ${sync.fields_sent.join(', ')}`
             : '';
-        return `<section><h3>Shape CRM sync</h3>
+        const syncText = `${badgeLabel}\n${sync.message || '—'}${fields}`;
+        return `<section class="copy-section"><div class="section-head"><h3>Shape CRM sync</h3>${copyBtn('Copy')}</div>
           <div class="sync-box ${cls}">
             <span class="badge ${badgeCls}">${badgeLabel}</span>
-            <p style="margin:0.5rem 0 0">${esc(sync.message || '—')}</p>
-            ${fields}
+            <pre class="copy-block" style="margin-top:0.5rem;border:none;background:transparent;padding:0">${esc(syncText)}</pre>
           </div></section>`;
       }
 
@@ -369,21 +465,27 @@
         if (c.shape_url) links.push(`<a href="${c.shape_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Shape #${c.shape_lead_id}</a>`);
         if (c.mailer_desk_url) links.push(`<a href="${c.mailer_desk_url}" onclick="event.stopPropagation()">Offer ${esc(c.reference_code)}</a>`);
 
-        const summary = c.call_summary
-          ? `<section><h3>AI summary</h3><div class="note-block"><p>${esc(c.call_summary)}</p></div></section>`
-          : '';
+        const summary = copySection('AI summary', c.call_summary);
+        const rationale = copySection('Why this status', c.status_rationale);
+        const sales = copySection('LO coaching (AI)', c.sales_notes);
+        const ops = copySection('Ops notes (AI)', c.ops_notes);
 
-        const rationale = c.status_rationale
-          ? `<section><h3>Why this status</h3><p>${esc(c.status_rationale)}</p></section>`
-          : '';
-
-        const sales = c.sales_notes
-          ? `<section><h3>LO coaching (AI)</h3><div class="note-block"><p>${esc(c.sales_notes)}</p></div></section>`
-          : '';
-
-        const ops = c.ops_notes
-          ? `<section><h3>Ops notes (AI)</h3><div class="note-block"><p>${esc(c.ops_notes)}</p></div></section>`
-          : '';
+        const aiReviewText = buildAiReviewText(c);
+        const fullCallText = buildFullCallText(c);
+        const copyPrefix = `copy-${c.call_id}`;
+        const hiddenCopySources = [
+          hiddenCopySource(`${copyPrefix}-ai`, aiReviewText),
+          hiddenCopySource(`${copyPrefix}-transcript`, c.transcript_text),
+          hiddenCopySource(`${copyPrefix}-all`, fullCallText),
+        ].join('');
+        const copyActions =
+          c.transcript_text || aiReviewText
+            ? `<div class="copy-actions">
+                ${aiReviewText ? `<button type="button" class="copy-btn" data-copy-source="${copyPrefix}-ai">Copy AI review</button>` : ''}
+                ${c.transcript_text ? `<button type="button" class="copy-btn" data-copy-source="${copyPrefix}-transcript">Copy transcript</button>` : ''}
+                ${fullCallText ? `<button type="button" class="copy-btn" data-copy-source="${copyPrefix}-all">Copy all</button>` : ''}
+              </div>${hiddenCopySources}`
+            : '';
 
         const needsAnalyze = Boolean(c.needs_ai_analysis);
         const analyzeBlock =
@@ -411,7 +513,7 @@
           : '';
 
         const transcript = c.transcript_text
-          ? `<section><h3>Transcript</h3>${analyzeBlock}<pre>${esc(c.transcript_text)}</pre></section>`
+          ? `<section class="copy-section"><div class="section-head"><h3>Transcript</h3>${copyBtn('Copy')}</div>${analyzeBlock}<pre class="copy-block transcript-block">${esc(c.transcript_text)}</pre></section>`
           : c.transcript_state !== 'pending'
             ? `<section><h3>Transcript</h3><p class="details">Still processing…</p>${refetchBlock}</section>`
             : `<section><h3>Transcript</h3><p class="details">Not received yet — usually ~5–10 min after the call. If it stays stuck, pull it from Zoom.</p>${refetchBlock}</section>`;
@@ -437,7 +539,8 @@
             </div>
             <div class="time">${fmtTime(c.answered_at)} ET</div>
           </div>
-          <div class="call-body">
+          <div class="call-body" onclick="event.stopPropagation()">
+            ${copyActions}
             ${summary}
             ${rationale}
             ${extracted}
@@ -447,6 +550,50 @@
             ${transcript}
           </div>
         </article>`;
+      }
+
+      async function copyText(text, btn) {
+        const value = String(text ?? '').trim();
+        if (!value) return;
+        try {
+          await navigator.clipboard.writeText(value);
+        } catch {
+          const ta = document.createElement('textarea');
+          ta.value = value;
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        if (btn) {
+          const label = btn.dataset.copyLabel || 'Copy';
+          btn.textContent = 'Copied!';
+          btn.classList.add('copied');
+          setTimeout(() => {
+            btn.textContent = label;
+            btn.classList.remove('copied');
+          }, 1600);
+        }
+      }
+
+      function bindCopyHandlers() {
+        document.querySelectorAll('button.copy-btn').forEach((btn) => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            if (btn.dataset.copySource) {
+              const el = document.getElementById(btn.dataset.copySource);
+              await copyText(el?.value ?? '', btn);
+              return;
+            }
+            const block =
+              btn.closest('.copy-section')?.querySelector('.copy-block') ||
+              btn.closest('section')?.querySelector('.copy-block');
+            await copyText(block?.textContent ?? '', btn);
+          });
+        });
       }
 
       function bindExpandHandlers() {
@@ -550,6 +697,7 @@
         bindExpandHandlers();
         bindRefetchHandlers();
         bindAnalyzeHandlers();
+        bindCopyHandlers();
       }
 
       document.querySelectorAll('.filter[data-channel]').forEach((btn) => {
