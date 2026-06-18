@@ -29,8 +29,7 @@ export default async function handler(req, res) {
     console.error('[call-tracker-refetch] failed:', error);
 
     const statusCode = error.statusCode ?? 500;
-    const message =
-      statusCode === 500 ? 'Internal Server Error' : error.message ?? 'Request failed';
+    const message = error.message ?? 'Request failed';
 
     return sendJson(res, statusCode, {
       ok: false,

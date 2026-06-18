@@ -29,13 +29,12 @@ export default async function handler(req, res) {
     console.error('[call-tracker-analyze] failed:', error);
 
     const statusCode = error.statusCode ?? 500;
-    const message =
-      statusCode === 500 ? 'Internal Server Error' : error.message ?? 'Request failed';
+    const message = error.message ?? 'Request failed';
 
     return sendJson(res, statusCode, {
       ok: false,
-      error: message,
-      details: error.details ?? undefined,
+      error: statusCode === 500 ? message : message,
+      details: error.details ?? (statusCode === 500 ? String(error.stack ?? '').split('\n').slice(0, 3).join(' ') : undefined),
     });
   }
 }

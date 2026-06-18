@@ -28,7 +28,9 @@ window.InboundAuth = {
     const res = await fetch(path, { credentials: 'include' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.ok === false) {
-      throw new Error(data.error || `Request failed (${res.status})`);
+      const detail = data.details?.reason || data.details?.error || data.details;
+      const msg = data.error || `Request failed (${res.status})`;
+      throw new Error(detail ? `${msg}: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}` : msg);
     }
     return data;
   },
@@ -42,7 +44,9 @@ window.InboundAuth = {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.ok === false) {
-      throw new Error(data.error || `Request failed (${res.status})`);
+      const detail = data.details?.reason || data.details?.error || data.details;
+      const msg = data.error || `Request failed (${res.status})`;
+      throw new Error(detail ? `${msg}: ${typeof detail === 'string' ? detail : JSON.stringify(detail)}` : msg);
     }
     return data;
   },
