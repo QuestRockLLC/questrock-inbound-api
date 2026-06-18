@@ -13,7 +13,10 @@
     "api/zoom-transcript.js": {
       "maxDuration": 300
     },
-    "api/re-evaluate-transcript.js": {
+    "api/call-tracker-analyze.js": {
+      "maxDuration": 300
+    },
+    "api/call-tracker-refetch.js": {
       "maxDuration": 300
     },
     "api/call-answered.js": {

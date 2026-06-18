@@ -216,7 +216,14 @@
         font-size: 0.82rem;
         padding: 0.35rem 0.75rem;
       }
-      button.refetch:disabled {
+      button.analyze {
+        background: rgba(167, 139, 250, 0.12);
+        border-color: rgba(167, 139, 250, 0.35);
+        color: #c4b5fd;
+        font-size: 0.82rem;
+        padding: 0.35rem 0.75rem;
+      }
+      button.analyze:disabled {
         opacity: 0.55;
         cursor: wait;
       }
@@ -362,11 +369,19 @@
           : '';
 
         const sales = c.sales_notes
-          ? `<section><h3>Sales notes (LO / AI)</h3><div class="note-block"><p>${esc(c.sales_notes)}</p></div></section>`
+          ? `<section><h3>LO coaching (AI)</h3><div class="note-block"><p>${esc(c.sales_notes)}</p></div></section>`
           : '';
 
         const ops = c.ops_notes
-          ? `<section><h3>Ops notes</h3><div class="note-block"><p>${esc(c.ops_notes)}</p></div></section>`
+          ? `<section><h3>Ops notes (AI)</h3><div class="note-block"><p>${esc(c.ops_notes)}</p></div></section>`
+          : '';
+
+        const needsAnalyze = c.needs_ai_analysis || (c.transcript_text && !c.ai_status_label);
+        const analyzeBlock = needsAnalyze
+          ? `<div class="refetch-row">
+              <button type="button" class="analyze" data-call-id="${esc(c.call_id)}">Run AI summary &amp; coaching</button>
+              <span class="refetch-msg" data-analyze-msg="${esc(c.call_id)}"></span>
+            </div>`
           : '';
 
         const extracted = renderExtractedFields(c.extracted_fields);
@@ -381,7 +396,7 @@
           : '';
 
         const transcript = c.transcript_text
-          ? `<section><h3>Transcript</h3><pre>${esc(c.transcript_text)}</pre></section>`
+          ? `<section><h3>Transcript</h3>${analyzeBlock}<pre>${esc(c.transcript_text)}</pre></section>`
           : c.transcript_state !== 'pending'
             ? `<section><h3>Transcript</h3><p class="details">Still processing…</p>${refetchBlock}</section>`
             : `<section><h3>Transcript</h3><p class="details">Not received yet — usually ~5–10 min after the call. If it stays stuck, pull it from Zoom.</p>${refetchBlock}</section>`;
@@ -430,6 +445,41 @@
               const chev = el.querySelector('.chevron');
               if (chev) chev.textContent = el.dataset.callId === openCallId ? '▾' : '▸';
             });
+          });
+        });
+      }
+
+      function bindAnalyzeHandlers() {
+        document.querySelectorAll('button.analyze').forEach((btn) => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const callId = btn.dataset.callId;
+            const msg = document.querySelector(`[data-analyze-msg="${callId}"]`);
+            btn.disabled = true;
+            if (msg) {
+              msg.textContent = 'Running AI analysis…';
+              msg.className = 'refetch-msg';
+            }
+            try {
+              const data = await InboundAuth.apiPost('/api/call-tracker-analyze', { call_id: callId });
+              if (msg) {
+                msg.textContent = data.ai_status_label
+                  ? `Done — ${data.ai_status_label}`
+                  : data.message || 'Analysis complete.';
+                msg.className = 'refetch-msg ok';
+              }
+              await load();
+              openCallId = callId;
+              document.querySelectorAll('.call').forEach((el) => {
+                el.classList.toggle('open', el.dataset.callId === openCallId);
+              });
+            } catch (err) {
+              if (msg) {
+                msg.textContent = err.message || 'AI analysis failed.';
+                msg.className = 'refetch-msg err';
+              }
+              btn.disabled = false;
+            }
           });
         });
       }
@@ -484,6 +534,7 @@
         list.innerHTML = data.calls.map(renderCall).join('');
         bindExpandHandlers();
         bindRefetchHandlers();
+        bindAnalyzeHandlers();
       }
 
       document.querySelectorAll('.filter[data-channel]').forEach((btn) => {
