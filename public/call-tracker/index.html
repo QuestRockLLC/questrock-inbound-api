@@ -111,6 +111,40 @@
       .badge.landing { background: rgba(167, 139, 250, 0.2); color: #c4b5fd; }
       .badge.status { background: rgba(74, 222, 128, 0.15); color: #86efac; }
       .badge.pending { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+      .badge.sync-ok { background: rgba(74, 222, 128, 0.12); color: #86efac; }
+      .badge.sync-skip { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
+      .badge.sync-fail { background: rgba(248, 113, 113, 0.15); color: #fca5a5; }
+      .field-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        background: #0f172a;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .field-list li {
+        display: grid;
+        grid-template-columns: minmax(140px, 38%) 1fr;
+        gap: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.84rem;
+      }
+      .field-list li:last-child { border-bottom: none; }
+      .field-list .k { color: var(--muted); font-family: ui-monospace, monospace; font-size: 0.78rem; }
+      .field-list .v { color: #e2e8f0; word-break: break-word; }
+      .sync-box {
+        background: #0f172a;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.75rem;
+        font-size: 0.88rem;
+        line-height: 1.5;
+      }
+      .sync-box.ok { border-color: rgba(74, 222, 128, 0.35); }
+      .sync-box.skip { border-color: rgba(148, 163, 184, 0.35); }
+      .sync-box.fail { border-color: rgba(248, 113, 113, 0.35); }
       .details { color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
       .links { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.5rem; }
       .links a { color: #7dd3fc; font-size: 0.85rem; }
@@ -266,10 +300,47 @@
         return 'inbound';
       }
 
+      function renderExtractedFields(fields) {
+        if (!fields?.length) return '';
+        const items = fields
+          .map((row) => `<li><span class="k">${esc(row.field)}</span><span class="v">${esc(row.value)}</span></li>`)
+          .join('');
+        return `<section><h3>Extracted Shape fields (${fields.length})</h3><ul class="field-list">${items}</ul></section>`;
+      }
+
+      function renderShapeSync(sync) {
+        if (!sync) return '';
+        const state = sync.state || (sync.synced ? 'synced' : sync.skipped ? 'skipped' : 'failed');
+        const cls = state === 'synced' ? 'ok' : state === 'skipped' ? 'skip' : 'fail';
+        const badgeCls = state === 'synced' ? 'sync-ok' : state === 'skipped' ? 'sync-skip' : 'sync-fail';
+        const badgeLabel = state === 'synced' ? 'Shape synced' : state === 'skipped' ? 'Shape skipped' : 'Shape failed';
+        const fields =
+          sync.fields_sent?.length
+            ? `<ul class="field-list" style="margin-top:0.65rem">${sync.fields_sent
+                .map((f) => `<li><span class="k">${esc(f)}</span><span class="v">updated</span></li>`)
+                .join('')}</ul>`
+            : '';
+        return `<section><h3>Shape CRM sync</h3>
+          <div class="sync-box ${cls}">
+            <span class="badge ${badgeCls}">${badgeLabel}</span>
+            <p style="margin:0.5rem 0 0">${esc(sync.message || '—')}</p>
+            ${fields}
+          </div></section>`;
+      }
+
       function renderCall(c) {
+        const statusStyle = c.ai_status_color
+          ? ` style="background:${esc(c.ai_status_color)};color:#fff"`
+          : '';
         const statusBadge = c.ai_status_label
-          ? `<span class="badge status">${esc(c.ai_status_label)}</span>`
-          : `<span class="badge pending">${c.transcript_state === 'pending' ? 'Awaiting transcript' : 'Processing'}</span>`;
+          ? `<span class="badge status"${statusStyle}>${esc(c.ai_status_label)}</span>`
+          : `<span class="badge pending">${
+              c.transcript_state === 'awaiting_identification'
+                ? 'QuestMail — awaiting ID'
+                : c.transcript_state === 'pending'
+                  ? 'Awaiting transcript'
+                  : 'AI processing'
+            }</span>`;
 
         const landingBadge = c.landing_page_label
           ? `<span class="badge landing">${esc(c.landing_page_label)}</span>`
@@ -298,7 +369,10 @@
           ? `<section><h3>Ops notes</h3><div class="note-block"><p>${esc(c.ops_notes)}</p></div></section>`
           : '';
 
-        const needsRefetch = !c.transcript_text && (c.transcript_state === 'pending' || c.transcript_state === 'processing');
+        const extracted = renderExtractedFields(c.extracted_fields);
+        const shapeSync = renderShapeSync(c.shape_sync);
+
+        const needsRefetch = !c.transcript_text && (c.transcript_state === 'pending' || c.transcript_state === 'processing' || c.transcript_state === 'awaiting_identification');
         const refetchBlock = needsRefetch
           ? `<div class="refetch-row">
               <button type="button" class="refetch" data-call-id="${esc(c.call_id)}">Re-fetch from Zoom</button>
@@ -336,6 +410,8 @@
           <div class="call-body">
             ${summary}
             ${rationale}
+            ${extracted}
+            ${shapeSync}
             ${sales}
             ${ops}
             ${transcript}

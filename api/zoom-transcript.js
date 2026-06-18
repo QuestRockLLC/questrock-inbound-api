@@ -3,7 +3,6 @@ import { getSupabaseClient } from '../lib/supabase.js';
 import { findLeadByShapeId } from '../lib/leads.js';
 import { appendTranscript } from '../lib/transcripts.js';
 import {
-  processTranscriptPipeline,
   runBackgroundTranscriptJob,
 } from '../lib/process-transcript-pipeline.js';
 import { assertAuthorized, normalizePayload, readJsonBody, sendJson } from '../lib/http.js';
@@ -48,7 +47,7 @@ function parseTranscriptPayload(body) {
   const direction = String(normalized.direction ?? 'inbound').trim().toLowerCase();
   const { formattedPhone } = resolveLeadPhone(normalized);
 
-  const asyncMode = body.async !== false && body.async !== 'false';
+  const asyncMode = body.async === true || body.async === 'true';
 
   return {
     shapeLeadId: String(normalized.shapeLeadId).trim(),
@@ -91,7 +90,8 @@ async function ingestTranscriptOnly(payload) {
  * Zoom transcript handler.
  *
  * **Full pipeline** (default for `recording.completed` webhook):
- * Fetch transcript from Zoom API → resolve lead by call_id → AI + Shape sync + email.
+ * Fetch transcript from Zoom API → resolve lead by call_id → AI + Shape sync + admin email (synchronous).
+ * Pass `"async": true` to queue AI in the background instead.
  *
  * **Legacy** (flat body with shape_lead_id + transcript_text): unchanged behavior.
  */
@@ -112,7 +112,10 @@ export default async function handler(req, res) {
     assertAuthorized(req);
 
     if (isZoomRecordingPayload(body)) {
-      const ingest = await runTranscriptIngestPipeline(getSupabaseClient(), body, { asyncMode: true });
+      const syncAi = body.async !== true && body.async !== 'true';
+      const ingest = await runTranscriptIngestPipeline(getSupabaseClient(), body, {
+        asyncMode: !syncAi,
+      });
 
       if (ingest.retry) {
         return sendJson(res, 202, ingest);
@@ -154,7 +157,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const result = await processTranscriptPipeline(payload);
+    const result = await runBackgroundTranscriptJob(payload);
     return sendJson(res, 200, { pipeline: 'legacy', ...result });
   } catch (error) {
     console.error('[zoom-transcript] failed:', error);

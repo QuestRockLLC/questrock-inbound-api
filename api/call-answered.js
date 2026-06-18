@@ -177,7 +177,7 @@ export default async function handler(req, res) {
 
       let dispositionSend = { sent: false, reason: 'No disposition email built' };
       const disposition = result.disposition_email;
-      if (disposition?.email_to && !result.skipped) {
+      if (disposition?.email_to && !result.skipped && result.shape_lead_id && !result.questmail_deferred) {
         dispositionSend = await sendEmail({
           to: disposition.email_to,
           subject: disposition.email_subject,
