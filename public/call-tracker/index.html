@@ -292,6 +292,60 @@
       }
       .refetch-msg.ok { color: #86efac; }
       .refetch-msg.err { color: #fca5a5; }
+      .mailer-link-panel {
+        margin-bottom: 1rem;
+        padding: 0.9rem 1rem;
+        background: rgba(245, 158, 11, 0.08);
+        border: 1px solid rgba(245, 158, 11, 0.25);
+        border-radius: 10px;
+      }
+      .mailer-link-panel h3 { margin: 0 0 0.35rem; font-size: 0.95rem; }
+      .mailer-search-row {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-top: 0.65rem;
+      }
+      .mailer-search-row input {
+        flex: 1 1 12rem;
+        min-width: 10rem;
+        background: #0f172a;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        color: var(--ink);
+        padding: 0.45rem 0.85rem;
+        font: inherit;
+      }
+      .mailer-search-row input:focus {
+        outline: none;
+        border-color: rgba(245, 158, 11, 0.55);
+      }
+      button.mailer-search,
+      button.mailer-link {
+        background: rgba(245, 158, 11, 0.15);
+        border-color: rgba(245, 158, 11, 0.4);
+        color: #fcd34d;
+        font-size: 0.82rem;
+        padding: 0.35rem 0.75rem;
+      }
+      .mailer-results {
+        display: grid;
+        gap: 0.45rem;
+        margin-top: 0.75rem;
+      }
+      .mailer-hit {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.35rem 0.75rem;
+        align-items: center;
+        padding: 0.55rem 0.7rem;
+        background: #0f172a;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 0.85rem;
+      }
+      .mailer-hit strong { display: block; }
+      .mailer-hit .meta { color: var(--muted); font-size: 0.8rem; }
       .paste-panel {
         margin-top: 0.75rem;
         padding: 0.85rem;
@@ -578,6 +632,19 @@
             </div>${pastePanel}`
           : '';
 
+        const mailerLinkBlock = c.needs_mailer_link
+          ? `<section class="mailer-link-panel" onclick="event.stopPropagation()">
+              <h3>Link mailer lead</h3>
+              <p class="details">QuestMail could not auto-match offer code or callback phone. Search imported mailer by zip, name, street, or offer code — then link to attach the Shape record and run AI.</p>
+              <div class="mailer-search-row">
+                <input type="search" data-mailer-q="${esc(c.call_id)}" placeholder="38305, Pirtle, Comanche, offer code…" />
+                <button type="button" class="mailer-search" data-mailer-search="${esc(c.call_id)}">Search</button>
+              </div>
+              <div class="mailer-results" data-mailer-results="${esc(c.call_id)}"></div>
+              <span class="refetch-msg" data-mailer-msg="${esc(c.call_id)}"></span>
+            </section>`
+          : '';
+
         const transcript = c.transcript_text
           ? `<section class="copy-section"><div class="section-head"><h3>Transcript</h3>${copyBtn('Copy')}</div>${analyzeBlock}<pre class="copy-block transcript-block">${esc(c.transcript_text)}</pre></section>`
           : c.transcript_state !== 'pending'
@@ -606,6 +673,7 @@
             <div class="time">${fmtTime(c.answered_at)} ET</div>
           </div>
           <div class="call-body" onclick="event.stopPropagation()">
+            ${mailerLinkBlock}
             ${copyActions}
             ${summary}
             ${rationale}
@@ -771,6 +839,128 @@
         });
       }
 
+      function bindMailerLinkHandlers() {
+        document.querySelectorAll('button[data-mailer-search]').forEach((btn) => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const callId = btn.dataset.mailerSearch;
+            const input = document.querySelector(`[data-mailer-q="${callId}"]`);
+            const resultsEl = document.querySelector(`[data-mailer-results="${callId}"]`);
+            const msg = document.querySelector(`[data-mailer-msg="${callId}"]`);
+            const q = input?.value?.trim() ?? '';
+            if (q.length < 2) {
+              if (msg) {
+                msg.textContent = 'Enter at least 2 characters to search.';
+                msg.className = 'refetch-msg err';
+              }
+              return;
+            }
+            btn.disabled = true;
+            if (msg) {
+              msg.textContent = 'Searching mailer…';
+              msg.className = 'refetch-msg';
+            }
+            if (resultsEl) resultsEl.innerHTML = '';
+            try {
+              const data = await InboundAuth.apiGet(
+                `/api/call-tracker-link-mailer?q=${encodeURIComponent(q)}`,
+              );
+              const rows = data.results ?? [];
+              if (!rows.length) {
+                if (msg) {
+                  msg.textContent = 'No mailer rows found — try zip, last name, or street.';
+                  msg.className = 'refetch-msg err';
+                }
+                return;
+              }
+              if (resultsEl) {
+                resultsEl.innerHTML = rows
+                  .map((row) => {
+                    const name =
+                      row.full_name ||
+                      [row.first_name, row.last_name].filter(Boolean).join(' ') ||
+                      'Unknown';
+                    const addr = [row.address_line_1, row.city, row.state, row.zip_code]
+                      .filter(Boolean)
+                      .join(', ');
+                    return `<div class="mailer-hit">
+                      <div>
+                        <strong>${esc(name)}</strong>
+                        <div class="meta">${esc(row.reference_code || 'No code')} · ${esc(addr || 'No address')}</div>
+                      </div>
+                      <button type="button" class="mailer-link" data-mailer-link="${esc(callId)}" data-mailer-id="${esc(row.mailer_lead_id)}">Link &amp; run AI</button>
+                    </div>`;
+                  })
+                  .join('');
+                bindMailerLinkHandlers();
+              }
+              if (msg) {
+                msg.textContent = `${rows.length} match(es) — pick the correct row.`;
+                msg.className = 'refetch-msg ok';
+              }
+            } catch (err) {
+              if (msg) {
+                msg.textContent = err.message || 'Search failed.';
+                msg.className = 'refetch-msg err';
+              }
+            } finally {
+              btn.disabled = false;
+            }
+          });
+        });
+
+        document.querySelectorAll('button[data-mailer-link]').forEach((btn) => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const callId = btn.dataset.mailerLink;
+            const mailerId = btn.dataset.mailerId;
+            const msg = document.querySelector(`[data-mailer-msg="${callId}"]`);
+            btn.disabled = true;
+            if (msg) {
+              msg.textContent = 'Linking mailer row and running AI…';
+              msg.className = 'refetch-msg';
+            }
+            try {
+              const data = await InboundAuth.apiPost('/api/call-tracker-link-mailer', {
+                call_id: callId,
+                mailer_lead_id: mailerId,
+                run_ai: true,
+              });
+              if (msg) {
+                msg.textContent = data.ai_status_label
+                  ? `${data.message || 'Linked.'} — ${data.ai_status_label}`
+                  : data.message || 'Mailer linked.';
+                msg.className = 'refetch-msg ok';
+              }
+              await load();
+              openCallId = callId;
+              document.querySelectorAll('.call').forEach((el) => {
+                el.classList.toggle('open', el.dataset.callId === openCallId);
+              });
+            } catch (err) {
+              if (msg) {
+                msg.textContent = err.message || 'Link failed.';
+                msg.className = 'refetch-msg err';
+              }
+              btn.disabled = false;
+            }
+          });
+        });
+
+        document.querySelectorAll('.mailer-link-panel input').forEach((input) => {
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              e.stopPropagation();
+              const callId = input.dataset.mailerQ;
+              const btn = document.querySelector(`[data-mailer-search="${callId}"]`);
+              btn?.click();
+            }
+          });
+          input.addEventListener('click', (e) => e.stopPropagation());
+        });
+      }
+
       function bindRefetchHandlers() {
         document.querySelectorAll('button.refetch').forEach((btn) => {
           btn.addEventListener('click', async (e) => {
@@ -824,6 +1014,7 @@
         bindAnalyzeHandlers();
         bindCopyHandlers();
         bindPasteHandlers();
+        bindMailerLinkHandlers();
       }
 
       document.querySelectorAll('.filter[data-channel]').forEach((btn) => {
