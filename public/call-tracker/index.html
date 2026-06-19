@@ -292,6 +292,61 @@
       }
       .refetch-msg.ok { color: #86efac; }
       .refetch-msg.err { color: #fca5a5; }
+      .paste-panel {
+        margin-top: 0.75rem;
+        padding: 0.85rem;
+        background: #0f172a;
+        border: 1px dashed var(--border);
+        border-radius: 8px;
+      }
+      .paste-panel summary {
+        cursor: pointer;
+        color: #c4b5fd;
+        font-size: 0.84rem;
+        font-weight: 500;
+        user-select: none;
+      }
+      .paste-panel textarea {
+        width: 100%;
+        min-height: 140px;
+        margin-top: 0.65rem;
+        padding: 0.65rem 0.75rem;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #1e293b;
+        color: #e2e8f0;
+        font-family: ui-monospace, monospace;
+        font-size: 0.78rem;
+        line-height: 1.45;
+        resize: vertical;
+      }
+      .paste-panel textarea:focus {
+        outline: none;
+        border-color: rgba(167, 139, 250, 0.5);
+      }
+      .paste-options {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-top: 0.55rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      .paste-options label {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        cursor: pointer;
+      }
+      button.paste-save {
+        margin-top: 0.55rem;
+        background: rgba(167, 139, 250, 0.15);
+        border-color: rgba(167, 139, 250, 0.4);
+        color: #c4b5fd;
+        font-size: 0.82rem;
+        padding: 0.35rem 0.75rem;
+      }
     </style>
   </head>
   <body>
@@ -505,11 +560,22 @@
         const shapeSync = renderShapeSync(c.shape_sync);
 
         const needsRefetch = !c.transcript_text && (c.transcript_state === 'pending' || c.transcript_state === 'processing' || c.transcript_state === 'awaiting_identification');
+        const pastePanel = !c.transcript_text
+          ? `<details class="paste-panel" data-paste-panel="${esc(c.call_id)}">
+              <summary>Paste transcript from Zoom (if re-fetch fails)</summary>
+              <textarea data-paste-input="${esc(c.call_id)}" placeholder="Copy the full transcript from Zoom Phone → Call History → View transcript, then paste here…"></textarea>
+              <div class="paste-options">
+                <label><input type="checkbox" data-paste-run-ai="${esc(c.call_id)}" checked /> Run AI summary &amp; coaching after save</label>
+              </div>
+              <button type="button" class="paste-save" data-paste-save="${esc(c.call_id)}">Save pasted transcript</button>
+              <span class="refetch-msg" data-paste-msg="${esc(c.call_id)}"></span>
+            </details>`
+          : '';
         const refetchBlock = needsRefetch
           ? `<div class="refetch-row">
               <button type="button" class="refetch" data-call-id="${esc(c.call_id)}">Re-fetch from Zoom</button>
               <span class="refetch-msg" data-refetch-msg="${esc(c.call_id)}"></span>
-            </div>`
+            </div>${pastePanel}`
           : '';
 
         const transcript = c.transcript_text
@@ -646,6 +712,65 @@
         });
       }
 
+      function bindPasteHandlers() {
+        document.querySelectorAll('button[data-paste-save]').forEach((btn) => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const callId = btn.dataset.pasteSave;
+            const textarea = document.querySelector(`[data-paste-input="${callId}"]`);
+            const runAiEl = document.querySelector(`[data-paste-run-ai="${callId}"]`);
+            const msg = document.querySelector(`[data-paste-msg="${callId}"]`);
+            const text = textarea?.value?.trim() ?? '';
+
+            if (text.length < 40) {
+              if (msg) {
+                msg.textContent = 'Paste the full transcript first (at least a few lines).';
+                msg.className = 'refetch-msg err';
+              }
+              return;
+            }
+
+            btn.disabled = true;
+            if (msg) {
+              msg.textContent = runAiEl?.checked ? 'Saving and running AI…' : 'Saving transcript…';
+              msg.className = 'refetch-msg';
+            }
+
+            try {
+              const data = await InboundAuth.apiPost('/api/call-tracker-paste-transcript', {
+                call_id: callId,
+                transcript_text: text,
+                run_ai: runAiEl?.checked !== false,
+              });
+              if (msg) {
+                msg.textContent = data.skipped
+                  ? data.message
+                  : data.ai_status_label
+                    ? `Done — ${data.ai_status_label}`
+                    : data.message || 'Transcript saved.';
+                msg.className = data.skipped ? 'refetch-msg err' : 'refetch-msg ok';
+              }
+              await load();
+              openCallId = callId;
+              document.querySelectorAll('.call').forEach((el) => {
+                el.classList.toggle('open', el.dataset.callId === openCallId);
+              });
+            } catch (err) {
+              if (msg) {
+                msg.textContent = err.message || 'Save failed.';
+                msg.className = 'refetch-msg err';
+              }
+              btn.disabled = false;
+            }
+          });
+        });
+
+        document.querySelectorAll('.paste-panel').forEach((panel) => {
+          panel.addEventListener('toggle', (e) => e.stopPropagation());
+          panel.addEventListener('click', (e) => e.stopPropagation());
+        });
+      }
+
       function bindRefetchHandlers() {
         document.querySelectorAll('button.refetch').forEach((btn) => {
           btn.addEventListener('click', async (e) => {
@@ -698,6 +823,7 @@
         bindRefetchHandlers();
         bindAnalyzeHandlers();
         bindCopyHandlers();
+        bindPasteHandlers();
       }
 
       document.querySelectorAll('.filter[data-channel]').forEach((btn) => {

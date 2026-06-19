@@ -13,6 +13,9 @@
     "api/zoom-transcript.js": {
       "maxDuration": 300
     },
+    "api/call-tracker-paste-transcript.js": {
+      "maxDuration": 300
+    },
     "api/call-tracker-analyze.js": {
       "maxDuration": 300
     },
