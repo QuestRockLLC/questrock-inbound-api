@@ -19,6 +19,7 @@
         --border: #334155;
         --questmail: #f59e0b;
         --inbound: #38bdf8;
+        --shape: #fb7185;
         --landing: #a78bfa;
         --accent: #4ade80;
       }
@@ -109,6 +110,7 @@
       }
       .badge.questmail { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
       .badge.inbound { background: rgba(56, 189, 248, 0.15); color: #7dd3fc; }
+      .badge.shape { background: rgba(251, 113, 133, 0.18); color: #fda4af; }
       .badge.landing { background: rgba(167, 139, 250, 0.2); color: #c4b5fd; }
       .badge.status { background: rgba(74, 222, 128, 0.15); color: #86efac; }
       .badge.pending { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
@@ -401,6 +403,18 @@
         font-size: 0.82rem;
         padding: 0.35rem 0.75rem;
       }
+      button.open-shape {
+        background: rgba(251, 113, 133, 0.15);
+        border-color: rgba(251, 113, 133, 0.45);
+        color: #fda4af;
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 0.4rem 0.85rem;
+        text-decoration: none;
+        display: inline-block;
+        border-radius: 999px;
+      }
+      button.open-shape:hover { background: rgba(251, 113, 133, 0.25); }
     </style>
   </head>
   <body>
@@ -425,8 +439,10 @@
         <button type="button" class="filter active" data-channel="">All calls</button>
         <button type="button" class="filter" data-channel="questmail">QuestMail</button>
         <button type="button" class="filter" data-channel="inbound_zoom">Inbound ads</button>
-        <button type="button" class="filter" data-hours="24">24h</button>
-        <button type="button" class="filter" data-hours="168">7 days</button>
+        <button type="button" class="filter" data-channel="shape_inbound">Shape leads</button>
+        <button type="button" class="filter active" data-hours="24">Today</button>
+        <button type="button" class="filter" data-hours="168">Week</button>
+        <button type="button" class="filter" data-hours="720">Month</button>
         <button type="button" id="refresh" class="primary">Refresh</button>
       </div>
 
@@ -448,7 +464,7 @@
     <script>
       let channel = '';
       let state = '';
-      let hours = 168;
+      let hours = 24;
       let openCallId = null;
 
       function fmtTime(iso) {
@@ -471,8 +487,16 @@
 
       function badgeClass(c) {
         if (c.call_channel === 'questmail') return 'questmail';
+        if (c.call_channel === 'shape_inbound') return 'shape';
         if (c.landing_page_label) return 'landing';
         return 'inbound';
+      }
+
+      function hoursLabel(h) {
+        if (h <= 24) return 'today';
+        if (h <= 168) return '7 days';
+        if (h <= 720) return '30 days';
+        return `${h}h`;
       }
 
       function copyBtn(label = 'Copy') {
@@ -558,7 +582,9 @@
                 ? 'Transcript ready — run AI'
                 : c.transcript_state === 'awaiting_identification'
                   ? 'QuestMail — awaiting ID'
-                  : c.transcript_state === 'pending'
+                  : c.transcript_state === 'awaiting_call'
+                    ? 'Shape lead — awaiting call'
+                    : c.transcript_state === 'pending'
                     ? 'Awaiting transcript'
                     : 'AI processing'
             }</span>`;
@@ -571,7 +597,11 @@
         const dialed = c.dialed_number_display ? ` · Dialed ${esc(c.dialed_number_display)}` : '';
 
         const links = [];
-        if (c.shape_url) links.push(`<a href="${c.shape_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Shape #${c.shape_lead_id}</a>`);
+        if (c.shape_url) {
+          links.push(
+            `<a class="open-shape" href="${c.shape_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open in Shape #${esc(c.shape_lead_id)}</a>`,
+          );
+        }
         if (c.mailer_desk_url) links.push(`<a href="${c.mailer_desk_url}" onclick="event.stopPropagation()">Offer ${esc(c.reference_code)}</a>`);
 
         const summary = copySection('AI summary', c.call_summary);
@@ -613,11 +643,10 @@
         const extracted = renderExtractedFields(c.extracted_fields);
         const shapeSync = renderShapeSync(c.shape_sync);
 
-        const needsRefetch = !c.transcript_text && (c.transcript_state === 'pending' || c.transcript_state === 'processing' || c.transcript_state === 'awaiting_identification');
         const pastePanel = !c.transcript_text
           ? `<details class="paste-panel" data-paste-panel="${esc(c.call_id)}">
-              <summary>Paste transcript from Zoom (if re-fetch fails)</summary>
-              <textarea data-paste-input="${esc(c.call_id)}" placeholder="Copy the full transcript from Zoom Phone → Call History → View transcript, then paste here…"></textarea>
+              <summary>${c.is_shape_arrival ? 'Paste call transcript' : 'Paste transcript from Zoom (if re-fetch fails)'}</summary>
+              <textarea data-paste-input="${esc(c.call_id)}" placeholder="${c.is_shape_arrival ? 'Paste the call transcript here after the borrower calls in…' : 'Copy the full transcript from Zoom Phone → Call History → View transcript, then paste here…'}"></textarea>
               <div class="paste-options">
                 <label><input type="checkbox" data-paste-run-ai="${esc(c.call_id)}" checked /> Run AI summary &amp; coaching after save</label>
               </div>
@@ -625,11 +654,18 @@
               <span class="refetch-msg" data-paste-msg="${esc(c.call_id)}"></span>
             </details>`
           : '';
+
+        const needsRefetch =
+          !c.transcript_text &&
+          !c.is_shape_arrival &&
+          (c.transcript_state === 'pending' ||
+            c.transcript_state === 'processing' ||
+            c.transcript_state === 'awaiting_identification');
         const refetchBlock = needsRefetch
           ? `<div class="refetch-row">
               <button type="button" class="refetch" data-call-id="${esc(c.call_id)}">Re-fetch from Zoom</button>
               <span class="refetch-msg" data-refetch-msg="${esc(c.call_id)}"></span>
-            </div>${pastePanel}`
+            </div>`
           : '';
 
         const mailerLinkBlock = c.needs_mailer_link
@@ -647,9 +683,11 @@
 
         const transcript = c.transcript_text
           ? `<section class="copy-section"><div class="section-head"><h3>Transcript</h3>${copyBtn('Copy')}</div>${analyzeBlock}<pre class="copy-block transcript-block">${esc(c.transcript_text)}</pre></section>`
+          : c.transcript_state === 'awaiting_call'
+            ? `<section><h3>Transcript</h3><p class="details">Lead arrived from Shape — paste the call transcript once the borrower calls in.</p>${pastePanel}</section>`
           : c.transcript_state !== 'pending'
-            ? `<section><h3>Transcript</h3><p class="details">Still processing…</p>${refetchBlock}</section>`
-            : `<section><h3>Transcript</h3><p class="details">Not received yet — usually ~5–10 min after the call. If it stays stuck, pull it from Zoom.</p>${refetchBlock}</section>`;
+            ? `<section><h3>Transcript</h3><p class="details">Still processing…</p>${refetchBlock}${pastePanel}</section>`
+            : `<section><h3>Transcript</h3><p class="details">Not received yet — usually ~5–10 min after the call. If it stays stuck, pull it from Zoom.</p>${refetchBlock}${pastePanel}</section>`;
 
         const isOpen = openCallId === c.call_id;
 
@@ -1003,7 +1041,7 @@
         const data = await InboundAuth.apiGet(`/api/call-tracker?${params}`);
         const list = document.getElementById('list');
         document.getElementById('meta').textContent =
-          `${data.count} call(s) · last ${hours === 24 ? '24 hours' : '7 days'}${state ? ` · ${state} landing` : ''} · updated ${fmtTime(data.generated_at)} ET`;
+          `${data.count} call(s) · last ${data.view_label || hoursLabel(hours)}${state ? ` · ${state} landing` : ''} · updated ${fmtTime(data.generated_at)} ET`;
         if (!data.calls?.length) {
           list.innerHTML = '<p class="empty">No calls in this window yet.</p>';
           return;
@@ -1037,6 +1075,8 @@
 
       document.querySelectorAll('.filter[data-hours]').forEach((btn) => {
         btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter[data-hours]').forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
           hours = Number(btn.dataset.hours);
           load().catch((e) => alert(e.message));
         });

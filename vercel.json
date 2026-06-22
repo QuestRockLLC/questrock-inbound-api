@@ -36,6 +36,15 @@
     },
     "api/chat.js": {
       "maxDuration": 60
+    },
+    "api/shape-lead-sync.js": {
+      "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/shape-lead-sync",
+      "schedule": "*/15 * * * *"
+    }
+  ]
 }

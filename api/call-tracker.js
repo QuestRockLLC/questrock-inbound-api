@@ -12,15 +12,17 @@ export default async function handler(req, res) {
   try {
     assertInboundSession(req, { requireCallTracker: true });
 
-    const channel = String(req.query?.channel ?? '').trim().toLowerCase() || null;
     const state = String(req.query?.state ?? '').trim().toUpperCase() || null;
-    const hours = Number(req.query?.hours ?? 168);
+    const hours = Number(req.query?.hours ?? 24);
     const limit = Number(req.query?.limit ?? 80);
 
+    const allowedChannels = new Set(['questmail', 'inbound_zoom', 'shape_inbound']);
+    const channelParam = String(req.query?.channel ?? '').trim().toLowerCase() || null;
+
     const result = await listInboundCalls(getSupabaseClient(), {
-      channel: channel === 'questmail' || channel === 'inbound_zoom' ? channel : null,
+      channel: allowedChannels.has(channelParam) ? channelParam : null,
       state: state && state.length === 2 ? state : null,
-      hours: Number.isFinite(hours) ? hours : 168,
+      hours: Number.isFinite(hours) ? hours : 24,
       limit: Number.isFinite(limit) ? limit : 80,
     });
 
