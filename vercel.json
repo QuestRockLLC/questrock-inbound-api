@@ -25,6 +25,9 @@
     "api/call-tracker-refetch.js": {
       "maxDuration": 300
     },
+    "api/questmail-backfill.js": {
+      "maxDuration": 300
+    },
     "api/call-answered.js": {
       "maxDuration": 60
     },

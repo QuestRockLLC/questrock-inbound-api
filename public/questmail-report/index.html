@@ -291,6 +291,7 @@
       </header>
 
       <div class="actions no-print">
+        <button type="button" id="backfill">Repair &amp; reprocess</button>
         <button type="button" class="primary" id="save-pdf">Save as PDF</button>
         <button type="button" id="refresh">Refresh data</button>
       </div>
@@ -323,6 +324,7 @@
         return `<div class="stats">
           <div class="stat"><div class="num">${s.total_calls}</div><div class="lbl">Called in</div></div>
           <div class="stat"><div class="num">${s.talked}</div><div class="lbl">Talked to</div></div>
+          <div class="stat"><div class="num">${s.status_corrected ?? 0}</div><div class="lbl">Status corrected</div></div>
           <div class="stat good"><div class="num">${s.app_completed_pitch_scheduled ?? 0}</div><div class="lbl">App done · pitch sched.</div></div>
           <div class="stat good"><div class="num">${s.good ?? 0}</div><div class="lbl">Good / advancing</div></div>
           <div class="stat stuck"><div class="num">${s.stuck ?? 0}</div><div class="lbl">Stuck</div></div>
@@ -334,10 +336,16 @@
       function renderStatus(c) {
         const ops = c.ops_status_label || '—';
         const crm = c.crm_status_label;
-        if (crm && crm !== ops) {
-          return `${esc(ops)} <span class="sub">(CRM: ${esc(crm)})</span>`;
+        let html = esc(ops);
+        if (c.status_mismatch && c.crm_status_label) {
+          html += ` <span class="sub">(AI had: ${esc(c.crm_status_label)} — corrected from transcript)</span>`;
+        } else if (crm && crm !== ops) {
+          html += ` <span class="sub">(CRM: ${esc(crm)})</span>`;
         }
-        return esc(ops);
+        if (c.status_correction_reason) {
+          html += `<div class="sub" style="margin-top:0.2rem">${esc(c.status_correction_reason)}</div>`;
+        }
+        return html;
       }
 
       function renderPhone(c) {
@@ -375,6 +383,9 @@
         const nameNote = c.display_name_corrected && c.lead_record_name
           ? ` · <span class="sub">Lead record had: ${esc(c.lead_record_name)}</span>`
           : '';
+        const statusNote = c.status_mismatch
+          ? ` · <span class="sub">⚠ Status corrected from transcript (AI: ${esc(c.crm_status_label || '—')})</span>`
+          : '';
         const shapeNote =
           c.shape_lead_id && c.shared_shape_warning
             ? ` · <span class="sub">⚠ Same Shape # as other rows — verify linkage</span>`
@@ -390,7 +401,7 @@
             · Callback: <span class="mono">${esc(c.phone || 'not captured')}</span>
             · Offer: <span class="mono">${esc(c.reference_code || '—')}</span>
             · ${esc(c.questmail_label || c.channel_label || 'QuestMail')}
-            · ${shape}${nameNote}${shapeNote}
+            · ${shape}${nameNote}${shapeNote}${statusNote}
           </div>
           <dl class="summary-block">
             <dt>Ops status</dt>
@@ -456,6 +467,28 @@
         }
       }
 
+      document.getElementById('backfill').addEventListener('click', async () => {
+        const status = document.getElementById('status');
+        if (!confirm('Repair toll-free lead collisions and re-run AI on all QuestMail calls? This may take several minutes.')) {
+          return;
+        }
+        status.hidden = false;
+        status.textContent = 'Running backfill — repairing leads and reprocessing transcripts…';
+        status.className = 'loading no-print';
+        try {
+          const data = await InboundAuth.apiPost('/api/questmail-backfill', {
+            repair_phones: true,
+            split_leads: true,
+            reprocess: true,
+            reprocess_limit: 100,
+          });
+          status.textContent = `Backfill complete — reprocessed ${data.reprocess?.reprocessed ?? 0} call(s), cleared ${data.cleared_phones?.cleared ?? 0} toll-free phone(s), split ${data.split_leads?.split_count ?? 0} shared lead(s). Refreshing report…`;
+          await load();
+        } catch (err) {
+          status.textContent = err.message || 'Backfill failed.';
+          status.className = 'error no-print';
+        }
+      });
       document.getElementById('save-pdf').addEventListener('click', () => {
         window.print();
       });
