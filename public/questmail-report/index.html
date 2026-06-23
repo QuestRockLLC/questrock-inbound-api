@@ -3,40 +3,43 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>QuestMail Ops Report — QuestRock</title>
+    <title>QuestMail Lead Report — QuestRock</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap"
       rel="stylesheet"
     />
     <script src="/inbound-auth.js"></script>
     <style>
       :root {
-        --ink: #0f172a;
-        --muted: #475569;
+        --navy: #0c2340;
+        --navy-mid: #163a63;
+        --gold: #c9a227;
+        --ink: #1e293b;
+        --muted: #64748b;
         --border: #cbd5e1;
-        --good: #15803d;
-        --stuck: #c2410c;
-        --dna: #b45309;
-        --dead: #b91c1c;
-        --nurture: #64748b;
         --paper: #ffffff;
+        --green: #16a34a;
+        --orange: #ea580c;
+        --red: #dc2626;
+        --blue: #2563eb;
+        --purple: #7c3aed;
       }
 
       * { box-sizing: border-box; }
 
       body {
         margin: 0;
-        font-family: 'IBM Plex Sans', system-ui, sans-serif;
+        font-family: 'DM Sans', system-ui, sans-serif;
         color: var(--ink);
-        background: #f1f5f9;
+        background: #e8edf3;
         line-height: 1.45;
       }
 
       .screen-only {
-        max-width: 1100px;
+        max-width: 920px;
         margin: 0 auto;
-        padding: 1.25rem 1rem 3rem;
+        padding: 1rem 1rem 3rem;
       }
 
       header.screen-bar {
@@ -48,228 +51,281 @@
         margin-bottom: 1rem;
       }
 
-      header.screen-bar h1 {
-        margin: 0 0 0.25rem;
-        font-size: 1.5rem;
-      }
+      header.screen-bar h1 { margin: 0; font-size: 1.15rem; color: var(--navy); }
+      .sub { color: var(--muted); margin: 0; font-size: 0.88rem; }
+      nav a { color: var(--muted); margin-left: 0.75rem; font-size: 0.85rem; text-decoration: none; }
+      nav a:hover { color: var(--navy); }
 
-      .sub { color: var(--muted); margin: 0; font-size: 0.92rem; }
-
-      nav a {
-        color: var(--muted);
-        margin-left: 0.85rem;
-        font-size: 0.88rem;
-        text-decoration: none;
-      }
-
-      nav a:hover { color: var(--ink); }
-
-      .actions {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-        margin-bottom: 1rem;
-      }
-
+      .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
       button {
-        font: inherit;
-        cursor: pointer;
-        border-radius: 8px;
-        padding: 0.5rem 1rem;
-        border: 1px solid var(--border);
-        background: var(--paper);
+        font: inherit; cursor: pointer; border-radius: 6px;
+        padding: 0.45rem 0.9rem; border: 1px solid var(--border); background: var(--paper);
       }
+      button.primary { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 600; }
+      .loading, .error { padding: 2rem; text-align: center; color: var(--muted); }
+      .error { color: var(--red); }
 
-      button.primary {
-        background: var(--ink);
-        color: #fff;
-        border-color: var(--ink);
-        font-weight: 600;
-      }
-
-      .loading, .error {
-        padding: 2rem;
-        text-align: center;
-        color: var(--muted);
-      }
-
-      .error { color: var(--dead); }
-
-      /* Printable report */
       #report {
         background: var(--paper);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 2rem 2.25rem;
+        border: 1px solid #b8c4d4;
+        box-shadow: 0 8px 32px rgba(12, 35, 64, 0.12);
       }
 
-      .report-title {
-        border-bottom: 3px solid var(--ink);
-        padding-bottom: 1rem;
+      .report-hero {
+        background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+        color: #fff;
+        text-align: center;
+        padding: 1.75rem 1.5rem 1.5rem;
+        border-bottom: 4px solid var(--gold);
+      }
+
+      .report-hero h2 {
+        margin: 0;
+        font-family: 'DM Serif Display', Georgia, serif;
+        font-size: 2rem;
+        letter-spacing: 0.06em;
+        font-weight: 400;
+      }
+
+      .report-hero .cycle {
+        margin: 0.35rem 0 0;
+        font-size: 0.72rem;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.75);
+      }
+
+      .report-hero .generated {
+        margin-top: 0.5rem;
+        font-size: 0.78rem;
+        color: rgba(255,255,255,0.55);
+      }
+
+      .section {
+        padding: 1.25rem 1.5rem 1.5rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .section:last-child { border-bottom: none; }
+
+      .section-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 50%;
+        background: var(--navy);
+        color: #fff;
+        font-size: 0.75rem;
+        font-weight: 700;
+        margin-right: 0.5rem;
+        vertical-align: middle;
+      }
+
+      .section-title {
+        display: inline;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--navy);
+        vertical-align: middle;
+      }
+
+      .section-head { margin: 0 0 1rem; }
+
+      /* Overview */
+      .overview-grid {
+        display: grid;
+        grid-template-columns: 1fr 1.1fr 1fr;
+        gap: 1rem;
+        align-items: center;
+      }
+
+      .big-stat {
+        text-align: center;
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        padding: 1rem 0.5rem;
+      }
+
+      .big-stat .num {
+        font-size: 3.5rem;
+        font-weight: 700;
+        color: var(--navy);
+        line-height: 1;
+      }
+
+      .big-stat .lbl {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+        margin-top: 0.35rem;
+      }
+
+      .pie-wrap { text-align: center; }
+      .pie-wrap svg { max-width: 180px; height: auto; }
+
+      .legend { font-size: 0.82rem; }
+      .legend-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.45rem;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      .legend-pct { margin-left: auto; font-weight: 600; color: var(--navy); }
+
+      .summary-box {
+        margin-top: 1rem;
+        background: #f8fafc;
+        border-left: 4px solid var(--gold);
+        padding: 0.75rem 1rem;
+        font-size: 0.86rem;
+        color: var(--ink);
+      }
+
+      .summary-box strong { color: var(--navy); }
+
+      /* Pipeline table */
+      table.pipeline {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.84rem;
+      }
+
+      table.pipeline th,
+      table.pipeline td {
+        border: 1px solid var(--border);
+        padding: 0.5rem 0.65rem;
+        text-align: left;
+      }
+
+      table.pipeline th {
+        background: var(--navy);
+        color: #fff;
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      table.pipeline tr.child td:first-child { padding-left: 1.75rem; color: var(--muted); }
+      table.pipeline .count { font-weight: 700; color: var(--navy); }
+      table.pipeline tfoot td { font-weight: 700; background: #f1f5f9; }
+
+      .pipe-icon {
+        display: inline-block;
+        width: 1.1rem;
+        text-align: center;
+        margin-right: 0.35rem;
+      }
+
+      /* Scorecard */
+      .score-icons {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 0.65rem;
         margin-bottom: 1.25rem;
       }
 
-      .report-title h2 {
-        margin: 0 0 0.35rem;
-        font-size: 1.65rem;
-        letter-spacing: -0.02em;
-      }
-
-      .report-title .meta {
-        color: var(--muted);
-        font-size: 0.88rem;
-      }
-
-      .stats {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-        gap: 0.75rem;
-        margin-bottom: 1.5rem;
-      }
-
-      .stat {
+      .score-icon {
+        text-align: center;
         border: 1px solid var(--border);
         border-radius: 8px;
-        padding: 0.75rem 0.85rem;
+        padding: 0.75rem 0.35rem;
       }
 
-      .stat .num {
-        font-size: 1.5rem;
-        font-weight: 700;
-        line-height: 1.1;
-      }
+      .score-icon .emoji { font-size: 1.5rem; line-height: 1; }
+      .score-icon .val { font-size: 1.75rem; font-weight: 700; color: var(--navy); line-height: 1.1; margin-top: 0.25rem; }
+      .score-icon .lbl { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-top: 0.2rem; }
 
-      .stat .lbl {
-        font-size: 0.78rem;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        margin-top: 0.2rem;
-      }
-
-      .stat.good .num { color: var(--good); }
-      .stat.stuck .num { color: var(--stuck); }
-      .stat.dna .num { color: var(--dna); }
-      .stat.dead .num { color: var(--dead); }
-
-      .section-head {
-        font-size: 0.78rem;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--muted);
-        margin: 1.5rem 0 0.65rem;
-        font-weight: 600;
-      }
-
-      table.summary-table {
-        width: 100%;
-        border-collapse: collapse;
+      .conversion-flow {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem 0.25rem;
         font-size: 0.82rem;
+        margin-bottom: 1rem;
       }
 
-      table.summary-table th,
-      table.summary-table td {
+      .conv-box {
         border: 1px solid var(--border);
-        padding: 0.45rem 0.55rem;
-        text-align: left;
-        vertical-align: top;
+        border-radius: 6px;
+        padding: 0.45rem 0.65rem;
+        text-align: center;
+        min-width: 7.5rem;
       }
 
-      table.summary-table th {
-        background: #f8fafc;
-        font-weight: 600;
-        font-size: 0.72rem;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-      }
+      .conv-box .rate { font-size: 1.25rem; font-weight: 700; color: var(--navy); }
+      .conv-box .lbl { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+      .conv-arrow { color: var(--gold); font-size: 1.1rem; font-weight: 700; padding: 0 0.15rem; }
 
-      .pill {
-        display: inline-block;
-        font-size: 0.68rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        padding: 0.15rem 0.45rem;
-        border-radius: 999px;
-        white-space: nowrap;
-      }
-
-      .pill.good { background: #dcfce7; color: var(--good); }
-      .pill.stuck { background: #ffedd5; color: var(--stuck); }
-      .pill.did_not_advance { background: #fef3c7; color: var(--dna); }
-      .pill.dead { background: #fee2e2; color: var(--dead); }
-      .pill.nurture, .pill.other { background: #f1f5f9; color: var(--nurture); }
-
-      .call-card {
+      .takeaway {
+        background: linear-gradient(90deg, #f0f4f8, #fff);
         border: 1px solid var(--border);
         border-radius: 8px;
         padding: 0.85rem 1rem;
-        margin-bottom: 0.75rem;
-        break-inside: avoid;
-        page-break-inside: avoid;
+        font-size: 0.86rem;
       }
 
-      .call-card h3 {
-        margin: 0 0 0.35rem;
-        font-size: 1rem;
-      }
-
-      .call-meta {
-        font-size: 0.8rem;
-        color: var(--muted);
-        margin-bottom: 0.55rem;
-      }
-
-      .call-meta strong { color: var(--ink); }
-
-      .summary-block {
-        font-size: 0.88rem;
-        margin: 0.35rem 0 0;
-      }
-
-      .summary-block dt {
-        font-size: 0.7rem;
+      .takeaway dt {
+        font-size: 0.68rem;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: var(--muted);
-        margin-top: 0.45rem;
+        letter-spacing: 0.1em;
+        color: var(--navy);
+        font-weight: 700;
+        margin-bottom: 0.35rem;
       }
 
-      .summary-block dd {
-        margin: 0.15rem 0 0;
+      /* Detail appendix */
+      .appendix { background: #f8fafc; }
+      .appendix-toggle {
+        width: 100%;
+        text-align: left;
+        background: transparent;
+        border: none;
+        font-weight: 600;
+        color: var(--navy);
+        padding: 0;
+        font-size: 0.85rem;
       }
 
-      .mono { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; }
+      .detail-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin-top: 0.75rem; }
+      .detail-table th, .detail-table td { border: 1px solid var(--border); padding: 0.35rem 0.5rem; text-align: left; }
+      .detail-table th { background: #e2e8f0; font-size: 0.68rem; text-transform: uppercase; }
+
+      .pill {
+        display: inline-block;
+        font-size: 0.62rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        padding: 0.1rem 0.4rem;
+        border-radius: 999px;
+        background: #e2e8f0;
+      }
+
+      @media (max-width: 720px) {
+        .overview-grid { grid-template-columns: 1fr; }
+        .score-icons { grid-template-columns: repeat(3, 1fr); }
+      }
 
       @media print {
-        body {
-          background: #fff;
-        }
-
-        .no-print {
-          display: none !important;
-        }
-
-        .screen-only {
-          max-width: none;
-          padding: 0;
-        }
-
-        #report {
-          border: none;
-          border-radius: 0;
-          padding: 0;
-        }
-
-        .call-card {
-          break-inside: avoid;
-          page-break-inside: avoid;
-        }
-
-        @page {
-          margin: 0.65in;
-          size: letter;
-        }
+        body { background: #fff; }
+        .no-print { display: none !important; }
+        .screen-only { max-width: none; padding: 0; }
+        #report { border: none; box-shadow: none; }
+        .section { break-inside: avoid; }
+        @page { margin: 0.5in; size: letter; }
       }
     </style>
   </head>
@@ -277,8 +333,8 @@
     <div class="screen-only">
       <header class="screen-bar no-print">
         <div>
-          <h1>QuestMail Ops Report</h1>
-          <p class="sub">All QuestMail inbound calls · summary stats · customer call notes</p>
+          <h1>QuestMail Lead Report</h1>
+          <p class="sub">Nikk format · overview · pipeline · scorecard</p>
         </div>
         <div style="text-align:right">
           <span id="user-pill" class="sub"></span>
@@ -293,7 +349,7 @@
       <div class="actions no-print">
         <button type="button" id="backfill">Repair &amp; reprocess</button>
         <button type="button" class="primary" id="save-pdf">Save as PDF</button>
-        <button type="button" id="refresh">Refresh data</button>
+        <button type="button" id="refresh">Refresh</button>
       </div>
 
       <div id="status" class="loading no-print">Loading report…</div>
@@ -320,131 +376,199 @@
         });
       }
 
-      function renderStats(s) {
-        return `<div class="stats">
-          <div class="stat"><div class="num">${s.total_calls}</div><div class="lbl">Called in</div></div>
-          <div class="stat"><div class="num">${s.talked}</div><div class="lbl">Talked to</div></div>
-          <div class="stat"><div class="num">${s.status_corrected ?? 0}</div><div class="lbl">Status corrected</div></div>
-          <div class="stat good"><div class="num">${s.app_completed_pitch_scheduled ?? 0}</div><div class="lbl">App done · pitch sched.</div></div>
-          <div class="stat good"><div class="num">${s.good ?? 0}</div><div class="lbl">Good / advancing</div></div>
-          <div class="stat stuck"><div class="num">${s.stuck ?? 0}</div><div class="lbl">Stuck</div></div>
-          <div class="stat dna"><div class="num">${s.did_not_advance ?? 0}</div><div class="lbl">Did not advance</div></div>
-          <div class="stat dead"><div class="num">${(s.dead ?? 0) + (s.nurture ?? 0)}</div><div class="lbl">Dead / nurture</div></div>
-        </div>`;
+      function renderPie(slices, total) {
+        if (!total || !slices.length) {
+          return '<p class="sub">No leads to chart yet.</p>';
+        }
+
+        const cx = 90;
+        const cy = 90;
+        const r = 72;
+        const ir = 42;
+        let angle = -Math.PI / 2;
+        const paths = [];
+
+        for (const slice of slices) {
+          const frac = slice.count / total;
+          const sweep = frac * Math.PI * 2;
+          const x1 = cx + r * Math.cos(angle);
+          const y1 = cy + r * Math.sin(angle);
+          angle += sweep;
+          const x2 = cx + r * Math.cos(angle);
+          const y2 = cy + r * Math.sin(angle);
+          const ix1 = cx + ir * Math.cos(angle - sweep);
+          const iy1 = cy + ir * Math.sin(angle - sweep);
+          const ix2 = cx + ir * Math.cos(angle);
+          const iy2 = cy + ir * Math.sin(angle);
+          const large = sweep > Math.PI ? 1 : 0;
+          paths.push(
+            `<path d="M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${ir} ${ir} 0 ${large} 0 ${ix1} ${iy1} Z" fill="${slice.color}" />`,
+          );
+        }
+
+        return `<svg viewBox="0 0 180 180" width="180" height="180" role="img" aria-label="Lead outcome pie chart">${paths.join('')}</svg>`;
       }
 
-      function renderStatus(c) {
-        const ops = c.ops_status_label || '—';
-        const crm = c.crm_status_label;
-        let html = esc(ops);
-        if (c.status_mismatch && c.crm_status_label) {
-          html += ` <span class="sub">(AI had: ${esc(c.crm_status_label)} — corrected from transcript)</span>`;
-        } else if (crm && crm !== ops) {
-          html += ` <span class="sub">(CRM: ${esc(crm)})</span>`;
-        }
-        if (c.status_correction_reason) {
-          html += `<div class="sub" style="margin-top:0.2rem">${esc(c.status_correction_reason)}</div>`;
-        }
-        return html;
+      function pipelineIcon(key) {
+        const icons = {
+          package_out: '📦',
+          verification_total: '✓',
+          verification_pitched: '→',
+          verification_waiting: '⏳',
+          did_not_advance: '✕',
+          bad_leads_spanish: '💬',
+          do_not_call: '🚫',
+        };
+        return icons[key] || '•';
       }
 
-      function renderPhone(c) {
-        if (c.phone) {
-          return esc(c.phone);
+      function renderPipelineTable(pipeline, totalLeads) {
+        let rows = '';
+        let total = 0;
+
+        for (const row of pipeline.rows ?? []) {
+          total += row.count;
+          rows += `<tr>
+            <td><span class="pipe-icon">${pipelineIcon(row.key)}</span>${esc(row.label)}</td>
+            <td class="count">${row.count}</td>
+            <td>${row.pct}%</td>
+          </tr>`;
+          for (const child of row.children ?? []) {
+            rows += `<tr class="child">
+              <td>${esc(child.label)}</td>
+              <td class="count">${child.count}</td>
+              <td>${child.pct}%</td>
+            </tr>`;
+          }
         }
-        if (c.inbound_questmail_line) {
-          return `<span class="sub">Toll-free inbound</span>`;
+
+        const nurture = pipeline.long_term_nurture ?? 0;
+        if (nurture > 0) {
+          total += nurture;
+          rows += `<tr>
+            <td><span class="pipe-icon">🌱</span>Long Term Nurture</td>
+            <td class="count">${nurture}</td>
+            <td>—</td>
+          </tr>`;
         }
-        return '—';
+
+        return `<table class="pipeline">
+          <thead><tr><th>Status</th><th>Count</th><th>% of Total Leads</th></tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr><td>TOTAL</td><td>${totalLeads ?? 0}</td><td>100%</td></tr></tfoot>
+        </table>`;
       }
 
-      function renderTableRow(c) {
-        return `<tr>
-          <td>${fmtDate(c.answered_at)}</td>
-          <td>${esc(c.borrower_name)}</td>
-          <td class="mono">${renderPhone(c)}</td>
-          <td class="mono">${esc(c.reference_code || '—')}</td>
-          <td>${esc(c.mailer_state || '—')}</td>
-          <td>${esc(c.lo_name || 'Unassigned')}</td>
-          <td>${esc(c.duration_display || '—')}</td>
-          <td><span class="pill ${esc(c.outcome_bucket)}">${esc(c.outcome_label)}</span></td>
-          <td>${renderStatus(c)}</td>
-        </tr>`;
+      function renderScorecard(sc) {
+        const icons = [
+          { emoji: '📞', val: sc.calls, lbl: 'Calls', color: 'var(--blue)' },
+          { emoji: '📋', val: sc.apps, lbl: 'Apps', color: 'var(--green)' },
+          { emoji: '📊', val: sc.credit, lbl: 'Credit', color: 'var(--orange)' },
+          { emoji: '🔀', val: sc.pipes, lbl: 'Pipes', color: 'var(--purple)' },
+          { emoji: '🤝', val: sc.closes, lbl: 'Closes', color: 'var(--red)' },
+        ];
+
+        const iconHtml = icons
+          .map(
+            (i) => `<div class="score-icon">
+              <div class="emoji">${i.emoji}</div>
+              <div class="val" style="color:${i.color}">${i.val}</div>
+              <div class="lbl">${i.lbl}</div>
+            </div>`,
+          )
+          .join('');
+
+        const conv = [
+          { rate: sc.calls_to_apps_rate, lbl: 'Calls → Apps Rate' },
+          { rate: sc.apps_to_credit_rate, lbl: 'Apps → Credit Rate' },
+          { rate: sc.credit_to_pipe_rate, lbl: 'Credit → Pipe Rate' },
+          { rate: sc.pipe_to_close_rate, lbl: 'Pipe → Close Rate' },
+        ];
+
+        const convHtml = conv
+          .map(
+            (c, i) =>
+              `${i ? '<span class="conv-arrow">→</span>' : ''}<div class="conv-box"><div class="rate">${c.rate}%</div><div class="lbl">${c.lbl}</div></div>`,
+          )
+          .join('');
+
+        return `${iconHtml}<div class="conversion-flow">${convHtml}</div>
+          <dl class="takeaway"><dt>Management Takeaway</dt><dd>${esc(sc.management_takeaway)}</dd></dl>`;
       }
 
-      function renderCallCard(c, index) {
-        const summary = c.customer_summary || 'No AI summary yet — check Call Tracker or run AI on this call.';
-        const next = c.whats_next || '—';
-        const shape = c.shape_url
-          ? `<a href="${c.shape_url}" class="no-print">Shape #${esc(c.shape_lead_id)}</a>`
-          : c.shape_lead_id
-            ? `Shape #${esc(c.shape_lead_id)}`
-            : '—';
-        const nameNote = c.display_name_corrected && c.lead_record_name
-          ? ` · <span class="sub">Lead record had: ${esc(c.lead_record_name)}</span>`
-          : '';
-        const statusNote = c.status_mismatch
-          ? ` · <span class="sub">⚠ Status corrected from transcript (AI: ${esc(c.crm_status_label || '—')})</span>`
-          : '';
-        const shapeNote =
-          c.shape_lead_id && c.shared_shape_warning
-            ? ` · <span class="sub">⚠ Same Shape # as other rows — verify linkage</span>`
-            : '';
+      function renderAppendix(calls) {
+        if (!calls?.length) return '';
+        const rows = calls
+          .map(
+            (c) => `<tr>
+              <td>${fmtDate(c.answered_at)}</td>
+              <td>${esc(c.borrower_name)}</td>
+              <td>${esc(c.ops_status_label || '—')}</td>
+              <td>${esc(c.reference_code || '—')}</td>
+              <td>${esc(c.lo_name || '—')}</td>
+              ${c.status_mismatch ? '<td class="sub">Corrected</td>' : '<td>—</td>'}
+            </tr>`,
+          )
+          .join('');
 
-        return `<article class="call-card">
-          <h3>${index + 1}. ${esc(c.borrower_name)} <span class="pill ${esc(c.outcome_bucket)}">${esc(c.outcome_label)}</span></h3>
-          <div class="call-meta">
-            <strong>${fmtDate(c.answered_at)} ET</strong>
-            · ${c.talked ? 'Talked' : 'No live conversation'}
-            · ${esc(c.duration_display || 'duration unknown')}
-            · LO: <strong>${esc(c.lo_name || 'Unassigned')}</strong>
-            · Callback: <span class="mono">${esc(c.phone || 'not captured')}</span>
-            · Offer: <span class="mono">${esc(c.reference_code || '—')}</span>
-            · ${esc(c.questmail_label || c.channel_label || 'QuestMail')}
-            · ${shape}${nameNote}${shapeNote}${statusNote}
-          </div>
-          <dl class="summary-block">
-            <dt>Ops status</dt>
-            <dd>${renderStatus(c)}</dd>
-            <dt>Customer summary (from call)</dt>
-            <dd>${esc(summary)}</dd>
-            <dt>What's next</dt>
-            <dd>${esc(next)}</dd>
-          </dl>
-        </article>`;
+        return `<section class="section appendix">
+          <details>
+            <summary class="appendix-toggle">Call-level detail (${calls.length} calls)</summary>
+            <table class="detail-table">
+              <thead><tr><th>Date</th><th>Borrower</th><th>Status</th><th>Offer</th><th>LO</th><th>AI fix</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </details>
+        </section>`;
       }
 
       function renderReport(data) {
-        const s = data.summary ?? {};
-        const calls = data.calls ?? [];
+        const lc = data.lead_cycle ?? {};
+        const ov = lc.overview ?? {};
+        const pl = lc.pipeline ?? {};
+        const sc = lc.scorecard ?? {};
 
-        const tableRows = calls.map(renderTableRow).join('');
-        const cards = calls.map((c, i) => renderCallCard(c, i)).join('');
+        const legend = (ov.pie ?? [])
+          .map(
+            (s) => `<div class="legend-row">
+              <span class="dot" style="background:${s.color}"></span>
+              <span>${esc(s.label)}</span>
+              <span class="legend-pct">${s.count} (${s.pct}%)</span>
+            </div>`,
+          )
+          .join('');
 
-        return `<div class="report-title">
-          <h2>QuestRock QuestMail — Ops Report</h2>
-          <div class="meta">Generated ${fmtDate(data.generated_at)} ET · ${calls.length} inbound call(s) on record</div>
+        return `<div class="report-hero">
+          <h2>QUESTMAIL LEAD REPORT</h2>
+          <p class="cycle">${esc(lc.cycle_label || 'CURRENT LEAD CYCLE')}</p>
+          <p class="generated">Generated ${fmtDate(data.generated_at)} ET · ${lc.total_calls ?? 0} call(s) · ${lc.total_leads ?? 0} unique lead(s)</p>
         </div>
-        ${renderStats(s)}
-        <div class="section-head">At a glance</div>
-        <table class="summary-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Borrower</th>
-              <th>Phone</th>
-              <th>Offer</th>
-              <th>State</th>
-              <th>LO</th>
-              <th>Duration</th>
-              <th>Outcome</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>${tableRows || '<tr><td colspan="9">No QuestMail calls yet.</td></tr>'}</tbody>
-        </table>
-        <div class="section-head">Customer summaries</div>
-        ${cards || '<p class="sub">No calls to show.</p>'}`;
+
+        <section class="section">
+          <p class="section-head"><span class="section-num">01</span><span class="section-title">Overview</span></p>
+          <div class="overview-grid">
+            <div class="big-stat">
+              <div class="num">${ov.total_questmail_leads ?? 0}</div>
+              <div class="lbl">Total QuestMail Leads</div>
+            </div>
+            <div class="pie-wrap">${renderPie(ov.pie ?? [], ov.total_questmail_leads ?? 0)}</div>
+            <div class="legend">${legend || '<p class="sub">No categorized leads yet.</p>'}</div>
+          </div>
+          <div class="summary-box"><strong>Overview Summary:</strong> ${esc(ov.summary || '')}</div>
+        </section>
+
+        <section class="section">
+          <p class="section-head"><span class="section-num">02</span><span class="section-title">Pipeline Breakdown</span></p>
+          ${renderPipelineTable(pl, lc.total_leads)}
+          <div class="summary-box" style="margin-top:1rem"><strong>Pipeline Summary:</strong> ${esc(pl.summary || '')}</div>
+        </section>
+
+        <section class="section">
+          <p class="section-head"><span class="section-num">03</span><span class="section-title">Performance Scorecard</span></p>
+          ${renderScorecard(sc)}
+        </section>
+
+        ${renderAppendix(data.calls)}`;
       }
 
       async function load() {
@@ -460,7 +584,7 @@
           reportEl.innerHTML = renderReport(data);
           reportEl.hidden = false;
           status.hidden = true;
-          document.title = `QuestMail Report (${data.count} calls) — QuestRock`;
+          document.title = `QuestMail Lead Report (${data.lead_cycle?.total_leads ?? data.count} leads)`;
         } catch (err) {
           status.textContent = err.message || 'Failed to load report.';
           status.className = 'error no-print';
@@ -469,11 +593,9 @@
 
       document.getElementById('backfill').addEventListener('click', async () => {
         const status = document.getElementById('status');
-        if (!confirm('Repair toll-free lead collisions and re-run AI on all QuestMail calls? This may take several minutes.')) {
-          return;
-        }
+        if (!confirm('Repair toll-free lead collisions and re-run AI on all QuestMail calls?')) return;
         status.hidden = false;
-        status.textContent = 'Running backfill — repairing leads and reprocessing transcripts…';
+        status.textContent = 'Running backfill…';
         status.className = 'loading no-print';
         try {
           const data = await InboundAuth.apiPost('/api/questmail-backfill', {
@@ -482,16 +604,15 @@
             reprocess: true,
             reprocess_limit: 100,
           });
-          status.textContent = `Backfill complete — reprocessed ${data.reprocess?.reprocessed ?? 0} call(s), cleared ${data.cleared_phones?.cleared ?? 0} toll-free phone(s), split ${data.split_leads?.split_count ?? 0} shared lead(s). Refreshing report…`;
+          status.textContent = `Done — reprocessed ${data.reprocess?.reprocessed ?? 0} call(s). Refreshing…`;
           await load();
         } catch (err) {
           status.textContent = err.message || 'Backfill failed.';
           status.className = 'error no-print';
         }
       });
-      document.getElementById('save-pdf').addEventListener('click', () => {
-        window.print();
-      });
+
+      document.getElementById('save-pdf').addEventListener('click', () => window.print());
       document.getElementById('refresh').addEventListener('click', () => load());
       document.getElementById('sign-out').addEventListener('click', (e) => {
         e.preventDefault();
