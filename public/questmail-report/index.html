@@ -496,6 +496,56 @@
           <dl class="takeaway"><dt>Management Takeaway</dt><dd>${esc(sc.management_takeaway)}</dd></dl>`;
       }
 
+      function renderTollAudit(audit) {
+        if (!audit) return '';
+        const summaryRows = (audit.toll_summary ?? [])
+          .map(
+            (t) => `<tr>
+              <td class="mono">${esc(t.display)}</td>
+              <td>${esc(t.state || '—')}</td>
+              <td>${esc(t.label || '—')}</td>
+              <td class="count">${t.tracked_count}</td>
+              <td>${t.mention_count}</td>
+              <td>${t.untracked_mentions?.length ?? 0}</td>
+            </tr>`,
+          )
+          .join('');
+
+        const missedRows = (audit.potentially_missed ?? [])
+          .slice(0, 20)
+          .map(
+            (m) => `<tr>
+              <td class="mono">${esc(m.display)}</td>
+              <td>${fmtDate(m.timestamp)}</td>
+              <td class="mono">${esc(m.call_id || '—')}</td>
+              <td>${esc(m.lead_name || '—')}</td>
+            </tr>`,
+          )
+          .join('');
+
+        const noAnswered = (audit.questmail_transcripts_without_answered ?? [])
+          .map(
+            (r) => `<tr>
+              <td>${fmtDate(r.timestamp)}</td>
+              <td class="mono">${esc(r.call_id)}</td>
+              <td>${esc(r.lead_name || '—')}</td>
+              <td class="mono">${esc((r.tolls_in_text || []).join(', ') || '—')}</td>
+            </tr>`,
+          )
+          .join('');
+
+        return `<section class="section">
+          <p class="section-head"><span class="section-num">04</span><span class="section-title">Toll-Free Line Audit (Jun 16–23)</span></p>
+          <p class="sub" style="margin:0 0 0.75rem">${audit.tracked_count ?? 0} QuestMail call(s) tracked · ${audit.unique_toll_lines_seen ?? 0} toll line(s) seen in recordings/transcripts</p>
+          <table class="pipeline" style="margin-bottom:1rem">
+            <thead><tr><th>Toll #</th><th>State</th><th>Mailer line</th><th>Tracked calls</th><th>Mentions</th><th>Untracked</th></tr></thead>
+            <tbody>${summaryRows || '<tr><td colspan="6">No QuestMail toll lines in this window.</td></tr>'}</tbody>
+          </table>
+          ${missedRows ? `<div class="summary-box" style="margin-bottom:0.75rem"><strong>Possibly missed</strong> — toll line in transcript but no QuestMail answered row:<table class="detail-table" style="margin-top:0.5rem"><thead><tr><th>Toll</th><th>When</th><th>Call ID</th><th>Name</th></tr></thead><tbody>${missedRows}</tbody></table></div>` : ''}
+          ${noAnswered ? `<div class="summary-box"><strong>Transcript without call-answered</strong>:<table class="detail-table" style="margin-top:0.5rem"><thead><tr><th>When</th><th>Call ID</th><th>Name</th><th>Toll in text</th></tr></thead><tbody>${noAnswered}</tbody></table></div>` : ''}
+        </section>`;
+      }
+
       function renderAppendix(calls) {
         if (!calls?.length) return '';
         const rows = calls
@@ -503,7 +553,7 @@
             (c) => `<tr>
               <td>${fmtDate(c.answered_at)}</td>
               <td>${esc(c.borrower_name)}</td>
-              <td>${esc(c.ops_status_label || '—')}</td>
+              <td>${esc(c.ops_status_label || '—')}${c.ops_ground_truth ? ' <span class="pill">verified</span>' : ''}${c.status_mismatch ? ' <span class="sub">(AI corrected)</span>' : ''}</td>
               <td>${esc(c.reference_code || '—')}</td>
               <td>${esc(c.lo_name || '—')}</td>
               ${c.status_mismatch ? '<td class="sub">Corrected</td>' : '<td>—</td>'}
@@ -540,8 +590,8 @@
 
         return `<div class="report-hero">
           <h2>QUESTMAIL LEAD REPORT</h2>
-          <p class="cycle">${esc(lc.cycle_label || 'CURRENT LEAD CYCLE')}</p>
-          <p class="generated">Generated ${fmtDate(data.generated_at)} ET · ${lc.total_calls ?? 0} call(s) · ${lc.total_leads ?? 0} unique lead(s)</p>
+          <p class="cycle">${esc(lc.cycle_label || data.cycle?.label || 'CURRENT LEAD CYCLE')}</p>
+          <p class="generated">Generated ${fmtDate(data.generated_at)} ET · ${lc.total_calls ?? 0} call(s) · ${lc.total_leads ?? 0} unique lead(s) · <strong>${lc.advanced_count ?? 0} advancing</strong></p>
         </div>
 
         <section class="section">
@@ -568,6 +618,7 @@
           ${renderScorecard(sc)}
         </section>
 
+        ${renderTollAudit(data.toll_audit)}
         ${renderAppendix(data.calls)}`;
       }
 

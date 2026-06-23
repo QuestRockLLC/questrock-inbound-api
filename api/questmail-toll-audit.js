@@ -1,12 +1,11 @@
 import { getSupabaseClient } from '../lib/supabase.js';
 import { assertInboundSession } from '../lib/request-auth.js';
 import { sendJson } from '../lib/http.js';
-import { buildQuestMailReport } from '../lib/call-tracker/questmail-report.js';
 import { resolveQuestMailCycle } from '../lib/call-tracker/questmail-cycle.js';
+import { auditQuestMailTollLines } from '../lib/call-tracker/questmail-toll-audit.js';
 
 /**
- * GET /api/questmail-report — ops summary for QuestMail cycle (default Jun 16–23).
- * Query: since, until, cycle_label
+ * GET /api/questmail-toll-audit — toll-free lines seen in transcripts vs tracked calls.
  */
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -17,8 +16,8 @@ export default async function handler(req, res) {
   try {
     assertInboundSession(req, { requireCallTracker: true });
     const cycle = resolveQuestMailCycle(req.query ?? {});
-    const report = await buildQuestMailReport(getSupabaseClient(), cycle);
-    return sendJson(res, 200, { ok: true, ...report });
+    const audit = await auditQuestMailTollLines(getSupabaseClient(), cycle);
+    return sendJson(res, 200, { ok: true, ...audit });
   } catch (error) {
     const statusCode = error.statusCode ?? 500;
     return sendJson(res, statusCode, {
