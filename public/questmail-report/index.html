@@ -375,6 +375,10 @@
         const nameNote = c.display_name_corrected && c.lead_record_name
           ? ` · <span class="sub">Lead record had: ${esc(c.lead_record_name)}</span>`
           : '';
+        const shapeNote =
+          c.shape_lead_id && c.shared_shape_warning
+            ? ` · <span class="sub">⚠ Same Shape # as other rows — verify linkage</span>`
+            : '';
 
         return `<article class="call-card">
           <h3>${index + 1}. ${esc(c.borrower_name)} <span class="pill ${esc(c.outcome_bucket)}">${esc(c.outcome_label)}</span></h3>
@@ -386,7 +390,7 @@
             · Callback: <span class="mono">${esc(c.phone || 'not captured')}</span>
             · Offer: <span class="mono">${esc(c.reference_code || '—')}</span>
             · ${esc(c.questmail_label || c.channel_label || 'QuestMail')}
-            · ${shape}${nameNote}
+            · ${shape}${nameNote}${shapeNote}
           </div>
           <dl class="summary-block">
             <dt>Ops status</dt>
