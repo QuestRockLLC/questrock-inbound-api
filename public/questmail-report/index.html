@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QuestMail Ops Report — QuestRock</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="/inbound-auth.js"></script>
+    <style>
+      :root {
+        --ink: #0f172a;
+        --muted: #475569;
+        --border: #cbd5e1;
+        --good: #15803d;
+        --stuck: #c2410c;
+        --dna: #b45309;
+        --dead: #b91c1c;
+        --nurture: #64748b;
+        --paper: #ffffff;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: 'IBM Plex Sans', system-ui, sans-serif;
+        color: var(--ink);
+        background: #f1f5f9;
+        line-height: 1.45;
+      }
+
+      .screen-only {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 1.25rem 1rem 3rem;
+      }
+
+      header.screen-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+      }
+
+      header.screen-bar h1 {
+        margin: 0 0 0.25rem;
+        font-size: 1.5rem;
+      }
+
+      .sub { color: var(--muted); margin: 0; font-size: 0.92rem; }
+
+      nav a {
+        color: var(--muted);
+        margin-left: 0.85rem;
+        font-size: 0.88rem;
+        text-decoration: none;
+      }
+
+      nav a:hover { color: var(--ink); }
+
+      .actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+      }
+
+      button {
+        font: inherit;
+        cursor: pointer;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--border);
+        background: var(--paper);
+      }
+
+      button.primary {
+        background: var(--ink);
+        color: #fff;
+        border-color: var(--ink);
+        font-weight: 600;
+      }
+
+      .loading, .error {
+        padding: 2rem;
+        text-align: center;
+        color: var(--muted);
+      }
+
+      .error { color: var(--dead); }
+
+      /* Printable report */
+      #report {
+        background: var(--paper);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 2rem 2.25rem;
+      }
+
+      .report-title {
+        border-bottom: 3px solid var(--ink);
+        padding-bottom: 1rem;
+        margin-bottom: 1.25rem;
+      }
+
+      .report-title h2 {
+        margin: 0 0 0.35rem;
+        font-size: 1.65rem;
+        letter-spacing: -0.02em;
+      }
+
+      .report-title .meta {
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .stat {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.75rem 0.85rem;
+      }
+
+      .stat .num {
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1.1;
+      }
+
+      .stat .lbl {
+        font-size: 0.78rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-top: 0.2rem;
+      }
+
+      .stat.good .num { color: var(--good); }
+      .stat.stuck .num { color: var(--stuck); }
+      .stat.dna .num { color: var(--dna); }
+      .stat.dead .num { color: var(--dead); }
+
+      .section-head {
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin: 1.5rem 0 0.65rem;
+        font-weight: 600;
+      }
+
+      table.summary-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+      }
+
+      table.summary-table th,
+      table.summary-table td {
+        border: 1px solid var(--border);
+        padding: 0.45rem 0.55rem;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      table.summary-table th {
+        background: #f8fafc;
+        font-weight: 600;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .pill {
+        display: inline-block;
+        font-size: 0.68rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0.15rem 0.45rem;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+
+      .pill.good { background: #dcfce7; color: var(--good); }
+      .pill.stuck { background: #ffedd5; color: var(--stuck); }
+      .pill.did_not_advance { background: #fef3c7; color: var(--dna); }
+      .pill.dead { background: #fee2e2; color: var(--dead); }
+      .pill.nurture, .pill.other { background: #f1f5f9; color: var(--nurture); }
+
+      .call-card {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.85rem 1rem;
+        margin-bottom: 0.75rem;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      .call-card h3 {
+        margin: 0 0 0.35rem;
+        font-size: 1rem;
+      }
+
+      .call-meta {
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-bottom: 0.55rem;
+      }
+
+      .call-meta strong { color: var(--ink); }
+
+      .summary-block {
+        font-size: 0.88rem;
+        margin: 0.35rem 0 0;
+      }
+
+      .summary-block dt {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin-top: 0.45rem;
+      }
+
+      .summary-block dd {
+        margin: 0.15rem 0 0;
+      }
+
+      .mono { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; }
+
+      @media print {
+        body {
+          background: #fff;
+        }
+
+        .no-print {
+          display: none !important;
+        }
+
+        .screen-only {
+          max-width: none;
+          padding: 0;
+        }
+
+        #report {
+          border: none;
+          border-radius: 0;
+          padding: 0;
+        }
+
+        .call-card {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+
+        @page {
+          margin: 0.65in;
+          size: letter;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="screen-only">
+      <header class="screen-bar no-print">
+        <div>
+          <h1>QuestMail Ops Report</h1>
+          <p class="sub">All QuestMail inbound calls · summary stats · customer call notes</p>
+        </div>
+        <div style="text-align:right">
+          <span id="user-pill" class="sub"></span>
+          <nav>
+            <a href="/call-tracker/">Call Tracker</a>
+            <a href="/mailer-import/">Import</a>
+            <a href="#" id="sign-out">Sign out</a>
+          </nav>
+        </div>
+      </header>
+
+      <div class="actions no-print">
+        <button type="button" class="primary" id="save-pdf">Save as PDF</button>
+        <button type="button" id="refresh">Refresh data</button>
+      </div>
+
+      <div id="status" class="loading no-print">Loading report…</div>
+      <div id="report" hidden></div>
+    </div>
+
+    <script>
+      function esc(s) {
+        return String(s ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function fmtDate(iso) {
+        if (!iso) return '—';
+        return new Date(iso).toLocaleString('en-US', {
+          timeZone: 'America/New_York',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        });
+      }
+
+      function renderStats(s) {
+        return `<div class="stats">
+          <div class="stat"><div class="num">${s.total_calls}</div><div class="lbl">Called in</div></div>
+          <div class="stat"><div class="num">${s.talked}</div><div class="lbl">Talked to</div></div>
+          <div class="stat good"><div class="num">${s.good ?? 0}</div><div class="lbl">Good / advancing</div></div>
+          <div class="stat stuck"><div class="num">${s.stuck ?? 0}</div><div class="lbl">Stuck</div></div>
+          <div class="stat dna"><div class="num">${s.did_not_advance ?? 0}</div><div class="lbl">Did not advance</div></div>
+          <div class="stat dead"><div class="num">${(s.dead ?? 0) + (s.nurture ?? 0)}</div><div class="lbl">Dead / nurture</div></div>
+        </div>`;
+      }
+
+      function renderTableRow(c) {
+        return `<tr>
+          <td>${fmtDate(c.answered_at)}</td>
+          <td>${esc(c.borrower_name)}</td>
+          <td class="mono">${esc(c.phone || '—')}</td>
+          <td class="mono">${esc(c.reference_code || '—')}</td>
+          <td>${esc(c.mailer_state || '—')}</td>
+          <td>${esc(c.lo_name || 'Unassigned')}</td>
+          <td>${esc(c.duration_display || '—')}</td>
+          <td><span class="pill ${esc(c.outcome_bucket)}">${esc(c.outcome_label)}</span></td>
+          <td>${esc(c.ai_status_label || c.lead_status_label || c.outcome_reason || '—')}</td>
+        </tr>`;
+      }
+
+      function renderCallCard(c, index) {
+        const summary = c.customer_summary || 'No AI summary yet — check Call Tracker or run AI on this call.';
+        const next = c.whats_next || '—';
+        const shape = c.shape_url
+          ? `<a href="${c.shape_url}" class="no-print">Shape #${esc(c.shape_lead_id)}</a>`
+          : c.shape_lead_id
+            ? `Shape #${esc(c.shape_lead_id)}`
+            : '—';
+
+        return `<article class="call-card">
+          <h3>${index + 1}. ${esc(c.borrower_name)} <span class="pill ${esc(c.outcome_bucket)}">${esc(c.outcome_label)}</span></h3>
+          <div class="call-meta">
+            <strong>${fmtDate(c.answered_at)} ET</strong>
+            · ${c.talked ? 'Talked' : 'No live conversation'}
+            · ${esc(c.duration_display || 'duration unknown')}
+            · LO: <strong>${esc(c.lo_name || 'Unassigned')}</strong>
+            · Offer: <span class="mono">${esc(c.reference_code || '—')}</span>
+            · ${esc(c.questmail_label || c.channel_label || 'QuestMail')}
+            · ${shape}
+          </div>
+          <dl class="summary-block">
+            <dt>Status</dt>
+            <dd>${esc(c.ai_status_label || c.lead_status_label || c.outcome_reason || '—')}</dd>
+            <dt>Customer summary (from call)</dt>
+            <dd>${esc(summary)}</dd>
+            <dt>What's next</dt>
+            <dd>${esc(next)}</dd>
+          </dl>
+        </article>`;
+      }
+
+      function renderReport(data) {
+        const s = data.summary ?? {};
+        const calls = data.calls ?? [];
+
+        const tableRows = calls.map(renderTableRow).join('');
+        const cards = calls.map((c, i) => renderCallCard(c, i)).join('');
+
+        return `<div class="report-title">
+          <h2>QuestRock QuestMail — Ops Report</h2>
+          <div class="meta">Generated ${fmtDate(data.generated_at)} ET · ${calls.length} inbound call(s) on record</div>
+        </div>
+        ${renderStats(s)}
+        <div class="section-head">At a glance</div>
+        <table class="summary-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Borrower</th>
+              <th>Phone</th>
+              <th>Offer</th>
+              <th>State</th>
+              <th>LO</th>
+              <th>Duration</th>
+              <th>Outcome</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows || '<tr><td colspan="9">No QuestMail calls yet.</td></tr>'}</tbody>
+        </table>
+        <div class="section-head">Customer summaries</div>
+        ${cards || '<p class="sub">No calls to show.</p>'}`;
+      }
+
+      async function load() {
+        const status = document.getElementById('status');
+        const reportEl = document.getElementById('report');
+        status.hidden = false;
+        status.textContent = 'Loading report…';
+        status.className = 'loading no-print';
+        reportEl.hidden = true;
+
+        try {
+          const data = await InboundAuth.apiGet('/api/questmail-report');
+          reportEl.innerHTML = renderReport(data);
+          reportEl.hidden = false;
+          status.hidden = true;
+          document.title = `QuestMail Report (${data.count} calls) — QuestRock`;
+        } catch (err) {
+          status.textContent = err.message || 'Failed to load report.';
+          status.className = 'error no-print';
+        }
+      }
+
+      document.getElementById('save-pdf').addEventListener('click', () => {
+        window.print();
+      });
+      document.getElementById('refresh').addEventListener('click', () => load());
+      document.getElementById('sign-out').addEventListener('click', (e) => {
+        e.preventDefault();
+        InboundAuth.signOut();
+      });
+
+      (async () => {
+        const user = await InboundAuth.requireAuth({ requireCallTracker: true });
+        if (!user) return;
+        document.getElementById('user-pill').textContent = user.email;
+        await load();
+      })();
+    </script>
+  </body>
+</html>
