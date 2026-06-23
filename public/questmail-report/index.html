@@ -323,6 +323,7 @@
         return `<div class="stats">
           <div class="stat"><div class="num">${s.total_calls}</div><div class="lbl">Called in</div></div>
           <div class="stat"><div class="num">${s.talked}</div><div class="lbl">Talked to</div></div>
+          <div class="stat good"><div class="num">${s.app_completed_pitch_scheduled ?? 0}</div><div class="lbl">App done · pitch sched.</div></div>
           <div class="stat good"><div class="num">${s.good ?? 0}</div><div class="lbl">Good / advancing</div></div>
           <div class="stat stuck"><div class="num">${s.stuck ?? 0}</div><div class="lbl">Stuck</div></div>
           <div class="stat dna"><div class="num">${s.did_not_advance ?? 0}</div><div class="lbl">Did not advance</div></div>
@@ -330,17 +331,36 @@
         </div>`;
       }
 
+      function renderStatus(c) {
+        const ops = c.ops_status_label || '—';
+        const crm = c.crm_status_label;
+        if (crm && crm !== ops) {
+          return `${esc(ops)} <span class="sub">(CRM: ${esc(crm)})</span>`;
+        }
+        return esc(ops);
+      }
+
+      function renderPhone(c) {
+        if (c.phone) {
+          return esc(c.phone);
+        }
+        if (c.inbound_questmail_line) {
+          return `<span class="sub">Toll-free inbound</span>`;
+        }
+        return '—';
+      }
+
       function renderTableRow(c) {
         return `<tr>
           <td>${fmtDate(c.answered_at)}</td>
           <td>${esc(c.borrower_name)}</td>
-          <td class="mono">${esc(c.phone || '—')}</td>
+          <td class="mono">${renderPhone(c)}</td>
           <td class="mono">${esc(c.reference_code || '—')}</td>
           <td>${esc(c.mailer_state || '—')}</td>
           <td>${esc(c.lo_name || 'Unassigned')}</td>
           <td>${esc(c.duration_display || '—')}</td>
           <td><span class="pill ${esc(c.outcome_bucket)}">${esc(c.outcome_label)}</span></td>
-          <td>${esc(c.ai_status_label || c.lead_status_label || c.outcome_reason || '—')}</td>
+          <td>${renderStatus(c)}</td>
         </tr>`;
       }
 
@@ -352,6 +372,9 @@
           : c.shape_lead_id
             ? `Shape #${esc(c.shape_lead_id)}`
             : '—';
+        const nameNote = c.display_name_corrected && c.lead_record_name
+          ? ` · <span class="sub">Lead record had: ${esc(c.lead_record_name)}</span>`
+          : '';
 
         return `<article class="call-card">
           <h3>${index + 1}. ${esc(c.borrower_name)} <span class="pill ${esc(c.outcome_bucket)}">${esc(c.outcome_label)}</span></h3>
@@ -360,13 +383,14 @@
             · ${c.talked ? 'Talked' : 'No live conversation'}
             · ${esc(c.duration_display || 'duration unknown')}
             · LO: <strong>${esc(c.lo_name || 'Unassigned')}</strong>
+            · Callback: <span class="mono">${esc(c.phone || 'not captured')}</span>
             · Offer: <span class="mono">${esc(c.reference_code || '—')}</span>
             · ${esc(c.questmail_label || c.channel_label || 'QuestMail')}
-            · ${shape}
+            · ${shape}${nameNote}
           </div>
           <dl class="summary-block">
-            <dt>Status</dt>
-            <dd>${esc(c.ai_status_label || c.lead_status_label || c.outcome_reason || '—')}</dd>
+            <dt>Ops status</dt>
+            <dd>${renderStatus(c)}</dd>
             <dt>Customer summary (from call)</dt>
             <dd>${esc(summary)}</dd>
             <dt>What's next</dt>
