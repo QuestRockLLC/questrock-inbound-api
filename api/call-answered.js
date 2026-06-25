@@ -177,7 +177,7 @@ export default async function handler(req, res) {
 
       let dispositionSend = { sent: false, reason: 'No disposition email built' };
       const disposition = result.disposition_email;
-      if (disposition?.email_to && !result.skipped && result.shape_lead_id && !result.questmail_deferred) {
+      if (disposition?.email_to && !result.skipped && result.shape_lead_id && !result.pending_disposition) {
         dispositionSend = await sendEmail({
           to: disposition.email_to,
           subject: disposition.email_subject,
@@ -187,8 +187,28 @@ export default async function handler(req, res) {
             shape_lead_id: result.shape_lead_id,
             call_id: result.call_id,
             lo_email: disposition.email_to,
+            contact_found: result.contact_found,
           },
         });
+
+        if (dispositionSend.sent && result.transcript_id) {
+          const { data: row } = await supabase
+            .from('transcripts')
+            .select('fields_populated')
+            .eq('transcript_id', result.transcript_id)
+            .maybeSingle();
+          const meta = row?.fields_populated ?? {};
+          await supabase
+            .from('transcripts')
+            .update({
+              fields_populated: {
+                ...meta,
+                disposition_email_sent_at: new Date().toISOString(),
+                pending_disposition: false,
+              },
+            })
+            .eq('transcript_id', result.transcript_id);
+        }
       }
 
       return sendJson(res, 200, { ...result, disposition_send: dispositionSend });

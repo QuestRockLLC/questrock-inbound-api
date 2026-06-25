@@ -113,11 +113,48 @@
       .badge.shape { background: rgba(251, 113, 133, 0.18); color: #fda4af; }
       .badge.landing { background: rgba(167, 139, 250, 0.2); color: #c4b5fd; }
       .badge.status { background: rgba(74, 222, 128, 0.15); color: #86efac; }
+      .badge.lo-disposition { background: rgba(96, 165, 250, 0.18); color: #93c5fd; margin-left: 0.35rem; }
+      .badge.lo-disposition.mismatch { background: rgba(251, 191, 36, 0.2); color: #fcd34d; }
       .badge.pending { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
       .badge.sync-ok { background: rgba(74, 222, 128, 0.12); color: #86efac; }
       .badge.sync-skip { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; }
       .badge.sync-fail { background: rgba(248, 113, 113, 0.15); color: #fca5a5; }
-      .field-list {
+      .qr-analysis {
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 100%);
+        border: 1px solid #475569;
+        border-left: 4px solid var(--accent);
+        border-radius: 10px;
+        padding: 1rem 1.1rem;
+        margin-bottom: 0.5rem;
+      }
+      .qr-analysis-head {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.85rem;
+      }
+      .qr-analysis-head strong {
+        font-size: 0.8rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .qr-analysis-section { margin-bottom: 0.85rem; }
+      .qr-analysis-section:last-child { margin-bottom: 0; }
+      .qr-analysis-section h4 {
+        margin: 0 0 0.35rem;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #cbd5e1;
+      }
+      .qr-analysis-section p {
+        margin: 0;
+        font-size: 0.9rem;
+        line-height: 1.55;
+        color: #e2e8f0;
+        white-space: pre-wrap;
+      }
         margin: 0;
         padding: 0;
         list-style: none;
@@ -422,7 +459,7 @@
       <header>
         <div>
           <h1>Call Tracker</h1>
-          <p class="sub">Transcripts · AI status · landing page / UTM · admin only</p>
+          <p class="sub">Transcripts · QuestRock AI analysis · landing page / UTM · admin only</p>
         </div>
         <div style="text-align:right">
           <span id="user-pill"></span>
@@ -525,10 +562,54 @@
         return fields.map((row) => `${row.field}: ${row.value}`).join('\n');
       }
 
+      function formatQuestRockAnalysisText(analysis) {
+        if (!analysis || typeof analysis !== 'object') return '';
+        const sections = [
+          ['Context & Key Participants', analysis.context_and_participants],
+          ['Financial & Loan Profile', analysis.financial_and_loan_profile],
+          ['Sales Pitch & Value Proposition', analysis.sales_pitch_and_value],
+          ['Key Friction Points & Barriers', analysis.friction_and_barriers],
+          ['Next Steps & Status', analysis.next_steps_and_status],
+        ];
+        return sections
+          .filter(([, body]) => String(body ?? '').trim())
+          .map(([title, body]) => `## ${title}\n${String(body).trim()}`)
+          .join('\n\n');
+      }
+
+      function renderQuestRockAnalysis(analysis) {
+        const text = formatQuestRockAnalysisText(analysis);
+        if (!text) return '';
+        const sections = [
+          ['Context & Key Participants', analysis.context_and_participants],
+          ['Financial & Loan Profile', analysis.financial_and_loan_profile],
+          ['Sales Pitch & Value Proposition', analysis.sales_pitch_and_value],
+          ['Key Friction Points & Barriers', analysis.friction_and_barriers],
+          ['Next Steps & Status', analysis.next_steps_and_status],
+        ].filter(([, body]) => String(body ?? '').trim());
+
+        const body = sections
+          .map(
+            ([title, content]) =>
+              `<div class="qr-analysis-section"><h4>${esc(title)}</h4><p>${esc(String(content).trim())}</p></div>`,
+          )
+          .join('');
+
+        return `<section class="copy-section qr-analysis-wrap">
+          <div class="qr-analysis">
+            <div class="qr-analysis-head"><strong>QuestRock AI</strong><span style="color:var(--muted);font-size:0.8rem">Call analysis</span></div>
+            ${body}
+          </div>
+          ${copySection('QuestRock AI (plain text)', text)}
+        </section>`;
+      }
+
       function buildAiReviewText(c) {
         const parts = [];
+        const qr = formatQuestRockAnalysisText(c.questrock_analysis);
+        if (qr) parts.push(`--- QuestRock AI Analysis ---\n${qr}`);
         if (c.ai_status_label) parts.push(`Status: ${c.ai_status_label}`);
-        if (c.call_summary) parts.push(`\n--- AI Summary ---\n${c.call_summary}`);
+        if (c.call_summary) parts.push(`\n--- Call summary ---\n${c.call_summary}`);
         if (c.status_rationale) parts.push(`\n--- Why this status ---\n${c.status_rationale}`);
         if (c.sales_notes) parts.push(`\n--- LO Coaching ---\n${c.sales_notes}`);
         if (c.ops_notes) parts.push(`\n--- Ops Notes ---\n${c.ops_notes}`);
@@ -577,10 +658,12 @@
           ? ` style="background:${esc(c.ai_status_color)};color:#fff"`
           : '';
         const statusBadge = c.ai_status_label
-          ? `<span class="badge status"${statusStyle}>${esc(c.ai_status_label)}</span>`
-          : `<span class="badge pending">${
+          ? `<span class="badge status" title="QuestRock AI"${statusStyle}>QuestRock AI: ${esc(c.ai_status_label)}</span>`
+          : c.pending_disposition
+            ? `<span class="badge pending">Disposition email pending</span>`
+            : `<span class="badge pending">${
               c.transcript_state === 'needs_ai'
-                ? 'Transcript ready — run AI'
+                ? 'Transcript ready — run QuestRock AI'
                 : c.transcript_state === 'awaiting_identification'
                   ? 'QuestMail — awaiting ID'
                   : c.transcript_state === 'awaiting_call'
@@ -589,6 +672,10 @@
                     ? 'Awaiting transcript'
                     : 'AI processing'
             }</span>`;
+
+        const loDispositionBadge = c.lo_disposition_label
+          ? `<span class="badge lo-disposition${c.lo_disposition_mismatch ? ' mismatch' : ''}" title="LO selected">LO: ${esc(c.lo_disposition_label)}</span>`
+          : '';
 
         const landingBadge = c.landing_page_label
           ? `<span class="badge landing">${esc(c.landing_page_label)}</span>`
@@ -605,10 +692,20 @@
         }
         if (c.mailer_desk_url) links.push(`<a href="${c.mailer_desk_url}" onclick="event.stopPropagation()">Offer ${esc(c.reference_code)}</a>`);
 
-        const summary = copySection('AI summary', c.call_summary);
-        const rationale = copySection('Why this status', c.status_rationale);
-        const sales = copySection('LO coaching (AI)', c.sales_notes);
-        const ops = copySection('Ops notes (AI)', c.ops_notes);
+        const loDispositionSection = c.lo_disposition_label
+          ? copySection(
+              'LO disposition',
+              `Status: ${c.lo_disposition_label}${c.lo_disposition_note ? `\n\nNote:\n${c.lo_disposition_note}` : ''}${c.lo_disposition_mismatch ? '\n\n⚠ LO status differs from QuestRock AI suggestion' : ''}`,
+            )
+          : '';
+        const questRockAnalysis = renderQuestRockAnalysis(c.questrock_analysis);
+        const summaryFallback =
+          !formatQuestRockAnalysisText(c.questrock_analysis) && c.call_summary
+            ? copySection('Call summary (QuestRock AI)', c.call_summary)
+            : '';
+        const rationale = copySection('Why this status (QuestRock AI)', c.status_rationale);
+        const sales = copySection('LO coaching', c.sales_notes);
+        const ops = copySection('Ops notes', c.ops_notes);
 
         const aiReviewText = buildAiReviewText(c);
         const fullCallText = buildFullCallText(c);
@@ -621,7 +718,7 @@
         const copyActions =
           c.transcript_text || aiReviewText
             ? `<div class="copy-actions">
-                ${aiReviewText ? `<button type="button" class="copy-btn" data-copy-source="${copyPrefix}-ai">Copy AI review</button>` : ''}
+                ${aiReviewText ? `<button type="button" class="copy-btn" data-copy-source="${copyPrefix}-ai">Copy QuestRock AI</button>` : ''}
                 ${c.transcript_text ? `<button type="button" class="copy-btn" data-copy-source="${copyPrefix}-transcript">Copy transcript</button>` : ''}
                 ${fullCallText ? `<button type="button" class="copy-btn" data-copy-source="${copyPrefix}-all">Copy all</button>` : ''}
               </div>${hiddenCopySources}`
@@ -631,12 +728,12 @@
         const analyzeBlock =
           c.transcript_text && needsAnalyze
             ? `<div class="refetch-row">
-              <button type="button" class="analyze" data-call-id="${esc(c.call_id)}">Run AI summary &amp; coaching</button>
-              <span class="refetch-msg" data-analyze-msg="${esc(c.call_id)}">Transcript saved — AI analysis not run yet.</span>
+              <button type="button" class="analyze" data-call-id="${esc(c.call_id)}">Run QuestRock AI analysis</button>
+              <span class="refetch-msg" data-analyze-msg="${esc(c.call_id)}">Transcript saved — QuestRock AI not run yet.</span>
             </div>`
             : c.transcript_text
               ? `<div class="refetch-row">
-              <button type="button" class="analyze secondary-analyze" data-call-id="${esc(c.call_id)}">Re-run AI summary &amp; coaching</button>
+              <button type="button" class="analyze secondary-analyze" data-call-id="${esc(c.call_id)}">Re-run QuestRock AI</button>
               <span class="refetch-msg" data-analyze-msg="${esc(c.call_id)}"></span>
             </div>`
               : '';
@@ -649,7 +746,7 @@
               <summary>${c.is_shape_arrival ? 'Paste call transcript' : 'Paste transcript from Zoom (if re-fetch fails)'}</summary>
               <textarea data-paste-input="${esc(c.call_id)}" placeholder="${c.is_shape_arrival ? 'Paste the call transcript here after the borrower calls in…' : 'Copy the full transcript from Zoom Phone → Call History → View transcript, then paste here…'}"></textarea>
               <div class="paste-options">
-                <label><input type="checkbox" data-paste-run-ai="${esc(c.call_id)}" checked /> Run AI summary &amp; coaching after save</label>
+                <label><input type="checkbox" data-paste-run-ai="${esc(c.call_id)}" checked /> Run QuestRock AI after save</label>
               </div>
               <button type="button" class="paste-save" data-paste-save="${esc(c.call_id)}">Save pasted transcript</button>
               <span class="refetch-msg" data-paste-msg="${esc(c.call_id)}"></span>
@@ -698,6 +795,7 @@
               <span class="badge ${badgeClass(c)}">${esc(c.channel_label)}</span>
               ${landingBadge}
               ${statusBadge}
+              ${loDispositionBadge}
               <h2>${esc(c.borrower_name)} <span class="chevron">${isOpen ? '▾' : '▸'}</span></h2>
               <div class="phone">${esc(c.phone || 'No phone')}</div>
               <div class="details">
@@ -714,7 +812,8 @@
           <div class="call-body" onclick="event.stopPropagation()">
             ${mailerLinkBlock}
             ${copyActions}
-            ${summary}
+            ${loDispositionSection}
+            ${questRockAnalysis || summaryFallback}
             ${rationale}
             ${extracted}
             ${shapeSync}
@@ -792,7 +891,7 @@
             const msg = document.querySelector(`[data-analyze-msg="${callId}"]`);
             btn.disabled = true;
             if (msg) {
-              msg.textContent = 'Running AI analysis…';
+              msg.textContent = 'Running QuestRock AI analysis…';
               msg.className = 'refetch-msg';
             }
             try {
@@ -810,7 +909,7 @@
               });
             } catch (err) {
               if (msg) {
-                msg.textContent = err.message || 'AI analysis failed.';
+                msg.textContent = err.message || 'QuestRock AI analysis failed.';
                 msg.className = 'refetch-msg err';
               }
               btn.disabled = false;
@@ -839,7 +938,7 @@
 
             btn.disabled = true;
             if (msg) {
-              msg.textContent = runAiEl?.checked ? 'Saving and running AI…' : 'Saving transcript…';
+              msg.textContent = runAiEl?.checked ? 'Saving and running QuestRock AI…' : 'Saving transcript…';
               msg.className = 'refetch-msg';
             }
 
@@ -927,7 +1026,7 @@
                         <strong>${esc(name)}</strong>
                         <div class="meta">${esc(row.reference_code || 'No code')} · ${esc(addr || 'No address')}</div>
                       </div>
-                      <button type="button" class="mailer-link" data-mailer-link="${esc(callId)}" data-mailer-id="${esc(row.mailer_lead_id)}">Link &amp; run AI</button>
+                      <button type="button" class="mailer-link" data-mailer-link="${esc(callId)}" data-mailer-id="${esc(row.mailer_lead_id)}">Link &amp; run QuestRock AI</button>
                     </div>`;
                   })
                   .join('');
@@ -956,7 +1055,7 @@
             const msg = document.querySelector(`[data-mailer-msg="${callId}"]`);
             btn.disabled = true;
             if (msg) {
-              msg.textContent = 'Linking mailer row and running AI…';
+              msg.textContent = 'Linking mailer row and running QuestRock AI…';
               msg.className = 'refetch-msg';
             }
             try {
