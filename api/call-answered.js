@@ -186,7 +186,11 @@ export default async function handler(req, res) {
           meta: {
             shape_lead_id: result.shape_lead_id,
             call_id: result.call_id,
+            lo_name: result.lo?.display_name || disposition.email_from_name,
             lo_email: disposition.email_to,
+            email_from: disposition.email_from,
+            email_from_name: disposition.email_from_name,
+            email_from_display: disposition.email_from_display,
             contact_found: result.contact_found,
           },
         });
