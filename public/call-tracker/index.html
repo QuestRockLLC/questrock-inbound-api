@@ -770,7 +770,7 @@
           sync.fields_sent?.length
             ? `\nFields updated: ${sync.fields_sent.join(', ')}`
             : '';
-        const syncText = `${badgeLabel}\n${sync.message || '—'}${fields}`;
+        const syncText = `${badgeLabel}\n${sync.message || sync.error || '—'}${sync.update_url ? `\nURL: ${sync.update_url}` : ''}${fields}`;
         return `<section class="copy-section"><div class="section-head"><h3>Shape CRM sync</h3>${copyBtn('Copy')}</div>
           <div class="sync-box ${cls}">
             <span class="badge ${badgeCls}">${badgeLabel}</span>
