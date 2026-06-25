@@ -740,6 +740,26 @@
         return copySection(`Extracted Shape fields (${fields.length})`, text);
       }
 
+      function renderLoDispositionBlock(c) {
+        if (!c.lo_disposition_label) return '';
+        const loSync = c.lo_disposition_shape_sync;
+        const shapeOk = loSync?.state === 'synced' || loSync?.synced === true;
+        const syncHint = shapeOk
+          ? loSync?.message || 'LO disposition synced to Shape'
+          : 'LO disposition not synced to Shape yet';
+        const section = copySection(
+          'LO disposition',
+          `Status: ${c.lo_disposition_label}${c.lo_disposition_note ? `\n\nNote:\n${c.lo_disposition_note}` : ''}${c.lo_disposition_mismatch ? '\n\n⚠ LO status differs from QuestRock AI suggestion' : ''}${loSync ? `\n\nShape: ${syncHint}` : ''}`,
+        );
+        const syncRow = `<div class="refetch-row">
+          <button type="button" class="analyze lo-shape-sync" data-call-id="${esc(c.call_id)}">${shapeOk ? 'Re-sync LO status to Shape' : 'Update Shape (LO status + note)'}</button>
+          <span class="refetch-msg${shapeOk ? ' ok' : ''}" data-lo-shape-msg="${esc(c.call_id)}">${shapeOk ? esc(syncHint) : ''}</span>
+        </div>`;
+        const loShapePanel =
+          loSync && !shapeOk ? renderShapeSync(loSync) : '';
+        return `${section}${syncRow}${loShapePanel}`;
+      }
+
       function renderShapeSync(sync) {
         if (!sync) return '';
         const state = sync.state || (sync.synced ? 'synced' : sync.skipped ? 'skipped' : 'failed');
@@ -797,12 +817,7 @@
         }
         if (c.mailer_desk_url) links.push(`<a href="${c.mailer_desk_url}" onclick="event.stopPropagation()">Offer ${esc(c.reference_code)}</a>`);
 
-        const loDispositionSection = c.lo_disposition_label
-          ? copySection(
-              'LO disposition',
-              `Status: ${c.lo_disposition_label}${c.lo_disposition_note ? `\n\nNote:\n${c.lo_disposition_note}` : ''}${c.lo_disposition_mismatch ? '\n\n⚠ LO status differs from QuestRock AI suggestion' : ''}`,
-            )
-          : '';
+        const loDispositionSection = renderLoDispositionBlock(c);
         const copyPrefix = `copy-${c.call_id}`;
         const questRockAnalysis = renderQuestRockAnalysis(c.questrock_analysis, `${copyPrefix}-qr`);
         const summaryFallback =
@@ -984,6 +999,44 @@
               const chev = el.querySelector('.chevron');
               if (chev) chev.textContent = el.dataset.callId === openCallId ? '▾' : '▸';
             });
+          });
+        });
+      }
+
+      function bindLoDispositionSyncHandlers() {
+        document.querySelectorAll('button.lo-shape-sync').forEach((btn) => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const callId = btn.dataset.callId;
+            const msg = document.querySelector(`[data-lo-shape-msg="${callId}"]`);
+            btn.disabled = true;
+            if (msg) {
+              msg.textContent = 'Updating Shape…';
+              msg.className = 'refetch-msg';
+            }
+            try {
+              const data = await InboundAuth.apiPost('/api/call-tracker-sync-disposition', {
+                call_id: callId,
+              });
+              const syncMsg =
+                data.lo_disposition_shape_sync?.message ||
+                (data.shape_sync?.synced ? 'Shape updated' : data.error || 'Updated');
+              if (msg) {
+                msg.textContent = syncMsg;
+                msg.className = data.shape_sync?.synced ? 'refetch-msg ok' : 'refetch-msg err';
+              }
+              await load();
+              openCallId = callId;
+              document.querySelectorAll('.call').forEach((el) => {
+                el.classList.toggle('open', el.dataset.callId === openCallId);
+              });
+            } catch (err) {
+              if (msg) {
+                msg.textContent = err.message || 'Shape sync failed.';
+                msg.className = 'refetch-msg err';
+              }
+              btn.disabled = false;
+            }
           });
         });
       }
@@ -1255,6 +1308,7 @@
         bindExpandHandlers();
         bindRefetchHandlers();
         bindAnalyzeHandlers();
+        bindLoDispositionSyncHandlers();
         bindCopyHandlers();
         bindPasteHandlers();
         bindMailerLinkHandlers();
