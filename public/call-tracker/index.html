@@ -148,6 +148,31 @@
         letter-spacing: 0.06em;
         color: #cbd5e1;
       }
+      .qr-coaching {
+        background: linear-gradient(135deg, rgba(30, 25, 15, 0.95) 0%, rgba(41, 37, 28, 0.9) 100%);
+        border: 1px solid #78716c;
+        border-left: 4px solid #f59e0b;
+        border-radius: 10px;
+        padding: 1rem 1.1rem;
+        margin-bottom: 0.5rem;
+      }
+      .qr-coaching-head strong {
+        font-size: 0.8rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #fbbf24;
+      }
+      .qr-coaching pre {
+        margin: 0.75rem 0 0;
+        font-size: 0.88rem;
+        line-height: 1.55;
+        color: #fef3c7;
+        white-space: pre-wrap;
+        font-family: inherit;
+        background: transparent;
+        border: none;
+        padding: 0;
+      }
       .qr-analysis-section p {
         margin: 0;
         font-size: 0.9rem;
@@ -155,6 +180,7 @@
         color: #e2e8f0;
         white-space: pre-wrap;
       }
+      .field-list {
         margin: 0;
         padding: 0;
         list-style: none;
@@ -604,6 +630,18 @@
         </section>`;
       }
 
+      function renderLoCoaching(salesNotes) {
+        const text = String(salesNotes ?? '').trim();
+        if (!text) return '';
+        return `<section class="copy-section qr-coaching-wrap">
+          <div class="qr-coaching">
+            <div class="qr-analysis-head qr-coaching-head"><strong>LO Coaching</strong><span style="color:var(--muted);font-size:0.8rem">Ray's playbook · QuestRock AI</span></div>
+            <pre>${esc(text)}</pre>
+          </div>
+          ${copySection('LO Coaching (plain text)', text)}
+        </section>`;
+      }
+
       function buildAiReviewText(c) {
         const parts = [];
         const qr = formatQuestRockAnalysisText(c.questrock_analysis);
@@ -611,7 +649,7 @@
         if (c.ai_status_label) parts.push(`Status: ${c.ai_status_label}`);
         if (c.call_summary) parts.push(`\n--- Call summary ---\n${c.call_summary}`);
         if (c.status_rationale) parts.push(`\n--- Why this status ---\n${c.status_rationale}`);
-        if (c.sales_notes) parts.push(`\n--- LO Coaching ---\n${c.sales_notes}`);
+        if (c.sales_notes) parts.push(`\n--- LO Coaching (Ray's Playbook) ---\n${c.sales_notes}`);
         if (c.ops_notes) parts.push(`\n--- Ops Notes ---\n${c.ops_notes}`);
         const fieldsText = formatExtractedFieldsText(c.extracted_fields);
         if (fieldsText) parts.push(`\n--- Extracted Shape Fields ---\n${fieldsText}`);
@@ -704,7 +742,7 @@
             ? copySection('Call summary (QuestRock AI)', c.call_summary)
             : '';
         const rationale = copySection('Why this status (QuestRock AI)', c.status_rationale);
-        const sales = copySection('LO coaching', c.sales_notes);
+        const loCoaching = renderLoCoaching(c.sales_notes);
         const ops = copySection('Ops notes', c.ops_notes);
 
         const aiReviewText = buildAiReviewText(c);
@@ -814,10 +852,10 @@
             ${copyActions}
             ${loDispositionSection}
             ${questRockAnalysis || summaryFallback}
+            ${loCoaching}
             ${rationale}
             ${extracted}
             ${shapeSync}
-            ${sales}
             ${ops}
             ${transcript}
           </div>
