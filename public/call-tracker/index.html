@@ -173,6 +173,22 @@
         border: none;
         padding: 0;
       }
+      .qr-coaching-section { margin-bottom: 0.85rem; }
+      .qr-coaching-section:last-child { margin-bottom: 0; }
+      .qr-coaching-section h4 {
+        margin: 0 0 0.35rem;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #fcd34d;
+      }
+      .qr-coaching-section p {
+        margin: 0;
+        font-size: 0.9rem;
+        line-height: 1.55;
+        color: #fef3c7;
+        white-space: pre-wrap;
+      }
       .qr-analysis-section p {
         margin: 0;
         font-size: 0.9rem;
@@ -603,7 +619,41 @@
           .join('\n\n');
       }
 
-      function renderQuestRockAnalysis(analysis) {
+      const RAY_COACHING_SECTIONS = [
+        ['ONE-LINE VERDICT', 'one_line_verdict'],
+        ['CALL PHASE', 'call_phase'],
+        ['RAY OUTCOME CODE', 'ray_outcome_code'],
+        ['FIELD SCORECARD', 'field_scorecard'],
+        ['FIRST CALL SCORE', 'first_call_score'],
+        ['KPI SCORE', 'kpi_score'],
+        ['DONE WELL', 'done_well'],
+        ['FIX NOW', 'fix_now'],
+        ['SAY THIS NEXT', 'say_this_next'],
+        ['RAY SCRIPT TO DEPLOY', 'ray_script'],
+        ['MISSED ON THIS CALL', 'missed_on_call'],
+        ['PROGRAM FIT', 'program_fit'],
+        ['TURNDOWN / SALVAGE REVIEW', 'turndown_salvage'],
+        ['NON-NEGOTIABLE FLAGS', 'non_negotiable_flags'],
+        ['CONVERSION MOVE', 'conversion_move'],
+      ];
+
+      function formatRayCoachingText(rayCoaching) {
+        if (!rayCoaching || typeof rayCoaching !== 'object') return '';
+        return RAY_COACHING_SECTIONS.filter(([, key]) => String(rayCoaching[key] ?? '').trim())
+          .map(([title, key]) => `${title}:\n${String(rayCoaching[key]).trim()}`)
+          .join('\n\n');
+      }
+
+      function renderPanelCopyHead(title, copyText, copyId) {
+        if (!copyText) return `<h3>${title}</h3>`;
+        return `<div class="section-head">
+          <h3>${title}</h3>
+          <button type="button" class="copy-btn" data-copy-source="${esc(copyId)}">Copy</button>
+          ${hiddenCopySource(copyId, copyText)}
+        </div>`;
+      }
+
+      function renderQuestRockAnalysis(analysis, copyId = 'qr-analysis') {
         const text = formatQuestRockAnalysisText(analysis);
         if (!text) return '';
         const sections = [
@@ -622,23 +672,39 @@
           .join('');
 
         return `<section class="copy-section qr-analysis-wrap">
+          ${renderPanelCopyHead('QuestRock AI · Call analysis', text, copyId)}
           <div class="qr-analysis">
-            <div class="qr-analysis-head"><strong>QuestRock AI</strong><span style="color:var(--muted);font-size:0.8rem">Call analysis</span></div>
             ${body}
           </div>
-          ${copySection('QuestRock AI (plain text)', text)}
         </section>`;
       }
 
-      function renderLoCoaching(salesNotes) {
-        const text = String(salesNotes ?? '').trim();
+      function renderLoCoaching(rayCoaching, salesNotesFallback, copyId = 'lo-coaching') {
+        const structuredText = formatRayCoachingText(rayCoaching);
+        const legacyText = String(salesNotesFallback ?? '').trim();
+        const text = structuredText || legacyText;
         if (!text) return '';
+
+        if (structuredText) {
+          const body = RAY_COACHING_SECTIONS.filter(([, key]) =>
+            String(rayCoaching[key] ?? '').trim(),
+          )
+            .map(([title, key]) => {
+              const content = String(rayCoaching[key]).trim();
+              const inner = title === 'FIELD SCORECARD' ? `<pre>${esc(content)}</pre>` : `<p>${esc(content)}</p>`;
+              return `<div class="qr-coaching-section"><h4>${esc(title)}</h4>${inner}</div>`;
+            })
+            .join('');
+
+          return `<section class="copy-section qr-coaching-wrap">
+            ${renderPanelCopyHead("LO Coaching · Ray's playbook", structuredText, copyId)}
+            <div class="qr-coaching">${body}</div>
+          </section>`;
+        }
+
         return `<section class="copy-section qr-coaching-wrap">
-          <div class="qr-coaching">
-            <div class="qr-analysis-head qr-coaching-head"><strong>LO Coaching</strong><span style="color:var(--muted);font-size:0.8rem">Ray's playbook · QuestRock AI</span></div>
-            <pre>${esc(text)}</pre>
-          </div>
-          ${copySection('LO Coaching (plain text)', text)}
+          ${renderPanelCopyHead("LO Coaching · Ray's playbook", legacyText, copyId)}
+          <div class="qr-coaching"><pre>${esc(legacyText)}</pre></div>
         </section>`;
       }
 
@@ -649,7 +715,8 @@
         if (c.ai_status_label) parts.push(`Status: ${c.ai_status_label}`);
         if (c.call_summary) parts.push(`\n--- Call summary ---\n${c.call_summary}`);
         if (c.status_rationale) parts.push(`\n--- Why this status ---\n${c.status_rationale}`);
-        if (c.sales_notes) parts.push(`\n--- LO Coaching (Ray's Playbook) ---\n${c.sales_notes}`);
+        const coachingText = formatRayCoachingText(c.ray_coaching) || c.sales_notes;
+        if (coachingText) parts.push(`\n--- LO Coaching (Ray's Playbook) ---\n${coachingText}`);
         if (c.ops_notes) parts.push(`\n--- Ops Notes ---\n${c.ops_notes}`);
         const fieldsText = formatExtractedFieldsText(c.extracted_fields);
         if (fieldsText) parts.push(`\n--- Extracted Shape Fields ---\n${fieldsText}`);
@@ -736,18 +803,18 @@
               `Status: ${c.lo_disposition_label}${c.lo_disposition_note ? `\n\nNote:\n${c.lo_disposition_note}` : ''}${c.lo_disposition_mismatch ? '\n\n⚠ LO status differs from QuestRock AI suggestion' : ''}`,
             )
           : '';
-        const questRockAnalysis = renderQuestRockAnalysis(c.questrock_analysis);
+        const copyPrefix = `copy-${c.call_id}`;
+        const questRockAnalysis = renderQuestRockAnalysis(c.questrock_analysis, `${copyPrefix}-qr`);
         const summaryFallback =
           !formatQuestRockAnalysisText(c.questrock_analysis) && c.call_summary
             ? copySection('Call summary (QuestRock AI)', c.call_summary)
             : '';
         const rationale = copySection('Why this status (QuestRock AI)', c.status_rationale);
-        const loCoaching = renderLoCoaching(c.sales_notes);
+        const loCoaching = renderLoCoaching(c.ray_coaching, c.sales_notes, `${copyPrefix}-coaching`);
         const ops = copySection('Ops notes', c.ops_notes);
 
         const aiReviewText = buildAiReviewText(c);
         const fullCallText = buildFullCallText(c);
-        const copyPrefix = `copy-${c.call_id}`;
         const hiddenCopySources = [
           hiddenCopySource(`${copyPrefix}-ai`, aiReviewText),
           hiddenCopySource(`${copyPrefix}-transcript`, c.transcript_text),
