@@ -37,6 +37,9 @@
     "api/call-tracker-manage.js": {
       "maxDuration": 30
     },
+    "api/questmail-weekly-report.js": {
+      "maxDuration": 60
+    },
     "api/lo-note.js": {
       "maxDuration": 60
     },
@@ -61,6 +64,14 @@
     },
     {
       "path": "/api/call-tracker-weekly-report?kind=friday",
+      "schedule": "0 21 * * 5"
+    },
+    {
+      "path": "/api/questmail-weekly-report?kind=monday",
+      "schedule": "0 13 * * 1"
+    },
+    {
+      "path": "/api/questmail-weekly-report?kind=friday",
       "schedule": "0 21 * * 5"
     }
   ]

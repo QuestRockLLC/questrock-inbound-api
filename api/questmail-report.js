@@ -5,8 +5,8 @@ import { buildQuestMailReport } from '../lib/call-tracker/questmail-report.js';
 import { resolveQuestMailCycle } from '../lib/call-tracker/questmail-cycle.js';
 
 /**
- * GET /api/questmail-report — ops summary for QuestMail cycle (default Jun 16–23).
- * Query: since, until, cycle_label
+ * GET /api/questmail-report — QuestMail ops summary.
+ * Query: kind=monday|friday (default friday), or since/until/cycle_label for custom range.
  */
 export default async function handler(req, res) {
   if (req.method !== 'GET') {

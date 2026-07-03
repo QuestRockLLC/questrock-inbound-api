@@ -62,6 +62,9 @@
         padding: 0.45rem 0.9rem; border: 1px solid var(--border); background: var(--paper);
       }
       button.primary { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 600; }
+      button.report-kind.active { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 600; }
+      .report-kind-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; align-items: center; }
+      .report-kind-bar span { font-size: 0.82rem; color: var(--muted); margin-right: 0.25rem; }
       .loading, .error { padding: 2rem; text-align: center; color: var(--muted); }
       .error { color: var(--red); }
 
@@ -346,6 +349,12 @@
         </div>
       </header>
 
+      <div class="report-kind-bar no-print">
+        <span>Report:</span>
+        <button type="button" class="report-kind" data-kind="monday" id="report-monday">Monday report</button>
+        <button type="button" class="report-kind active" data-kind="friday" id="report-friday">Friday report</button>
+      </div>
+
       <div class="actions no-print">
         <button type="button" id="backfill">Repair &amp; reprocess</button>
         <button type="button" class="primary" id="save-pdf">Save as PDF</button>
@@ -357,6 +366,8 @@
     </div>
 
     <script>
+      let reportKind = 'friday';
+
       function esc(s) {
         return String(s ?? '')
           .replace(/&/g, '&amp;')
@@ -496,7 +507,7 @@
           <dl class="takeaway"><dt>Management Takeaway</dt><dd>${esc(sc.management_takeaway)}</dd></dl>`;
       }
 
-      function renderTollAudit(audit) {
+      function renderTollAudit(audit, cycleLabel) {
         if (!audit) return '';
         const summaryRows = (audit.toll_summary ?? [])
           .map(
@@ -535,7 +546,7 @@
           .join('');
 
         return `<section class="section">
-          <p class="section-head"><span class="section-num">04</span><span class="section-title">Toll-Free Line Audit (Jun 16–23)</span></p>
+          <p class="section-head"><span class="section-num">04</span><span class="section-title">Toll-Free Line Audit${cycleLabel ? ` (${esc(cycleLabel)})` : ''}</span></p>
           <p class="sub" style="margin:0 0 0.75rem">${audit.tracked_count ?? 0} QuestMail call(s) tracked · ${audit.unique_toll_lines_seen ?? 0} toll line(s) seen in recordings/transcripts</p>
           <table class="pipeline" style="margin-bottom:1rem">
             <thead><tr><th>Toll #</th><th>State</th><th>Mailer line</th><th>Tracked calls</th><th>Mentions</th><th>Untracked</th></tr></thead>
@@ -577,6 +588,10 @@
         const ov = lc.overview ?? {};
         const pl = lc.pipeline ?? {};
         const sc = lc.scorecard ?? {};
+        const kind = data.cycle?.report_type || data.cycle?.kind || reportKind;
+        const reportTitle =
+          kind === 'friday' ? 'QUESTMAIL FRIDAY REPORT' : 'QUESTMAIL MONDAY REPORT';
+        const cycleLabel = lc.cycle_label || data.cycle?.label || 'CURRENT LEAD CYCLE';
 
         const legend = (ov.pie ?? [])
           .map(
@@ -589,8 +604,8 @@
           .join('');
 
         return `<div class="report-hero">
-          <h2>QUESTMAIL LEAD REPORT</h2>
-          <p class="cycle">${esc(lc.cycle_label || data.cycle?.label || 'CURRENT LEAD CYCLE')}</p>
+          <h2>${reportTitle}</h2>
+          <p class="cycle">${esc(cycleLabel)}</p>
           <p class="generated">Generated ${fmtDate(data.generated_at)} ET · ${lc.total_calls ?? 0} call(s) · ${lc.total_leads ?? 0} unique lead(s) · <strong>${lc.advanced_count ?? 0} advancing</strong></p>
         </div>
 
@@ -618,8 +633,14 @@
           ${renderScorecard(sc)}
         </section>
 
-        ${renderTollAudit(data.toll_audit)}
+        ${renderTollAudit(data.toll_audit, cycleLabel)}
         ${renderAppendix(data.calls)}`;
+      }
+
+      function setReportKindButtons() {
+        document.querySelectorAll('.report-kind').forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.kind === reportKind);
+        });
       }
 
       async function load() {
@@ -629,13 +650,14 @@
         status.textContent = 'Loading report…';
         status.className = 'loading no-print';
         reportEl.hidden = true;
+        setReportKindButtons();
 
         try {
-          const data = await InboundAuth.apiGet('/api/questmail-report');
+          const data = await InboundAuth.apiGet(`/api/questmail-report?kind=${encodeURIComponent(reportKind)}`);
           reportEl.innerHTML = renderReport(data);
           reportEl.hidden = false;
           status.hidden = true;
-          document.title = `QuestMail Lead Report (${data.lead_cycle?.total_leads ?? data.count} leads)`;
+          document.title = `${reportKind === 'friday' ? 'QuestMail Friday Report' : 'QuestMail Monday Report'} (${data.lead_cycle?.total_leads ?? data.count} leads)`;
         } catch (err) {
           status.textContent = err.message || 'Failed to load report.';
           status.className = 'error no-print';
@@ -663,6 +685,13 @@
         }
       });
 
+      document.querySelectorAll('.report-kind').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          reportKind = btn.dataset.kind || 'friday';
+          load().catch((e) => alert(e.message));
+        });
+      });
+
       document.getElementById('save-pdf').addEventListener('click', () => window.print());
       document.getElementById('refresh').addEventListener('click', () => load());
       document.getElementById('sign-out').addEventListener('click', (e) => {
@@ -674,6 +703,11 @@
         const user = await InboundAuth.requireAuth({ requireCallTracker: true });
         if (!user) return;
         document.getElementById('user-pill').textContent = user.email;
+        const params = new URLSearchParams(window.location.search);
+        const urlKind = params.get('kind');
+        if (urlKind === 'monday' || urlKind === 'friday') {
+          reportKind = urlKind;
+        }
         await load();
       })();
     </script>
