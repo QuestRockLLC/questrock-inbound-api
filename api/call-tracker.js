@@ -24,6 +24,8 @@ export default async function handler(req, res) {
       state: state && state.length === 2 ? state : null,
       hours: Number.isFinite(hours) ? hours : 24,
       limit: Number.isFinite(limit) ? limit : 80,
+      includeArchived: req.query?.include_archived === '1',
+      archivedOnly: req.query?.archived_only === '1',
     });
 
     return sendJson(res, 200, { ok: true, ...result });

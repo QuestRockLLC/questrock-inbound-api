@@ -31,6 +31,12 @@
     "api/call-answered.js": {
       "maxDuration": 60
     },
+    "api/call-tracker-weekly-report.js": {
+      "maxDuration": 60
+    },
+    "api/call-tracker-manage.js": {
+      "maxDuration": 30
+    },
     "api/lo-note.js": {
       "maxDuration": 60
     },
@@ -48,6 +54,14 @@
     {
       "path": "/api/shape-lead-sync",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/call-tracker-weekly-report?kind=monday",
+      "schedule": "0 13 * * 1"
+    },
+    {
+      "path": "/api/call-tracker-weekly-report?kind=friday",
+      "schedule": "0 21 * * 5"
     }
   ]
 }
