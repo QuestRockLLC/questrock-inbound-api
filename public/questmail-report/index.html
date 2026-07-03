@@ -306,6 +306,13 @@
       .detail-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin-top: 0.75rem; }
       .detail-table th, .detail-table td { border: 1px solid var(--border); padding: 0.35rem 0.5rem; text-align: left; }
       .detail-table th { background: #e2e8f0; font-size: 0.68rem; text-transform: uppercase; }
+      .detail-table .gist {
+        max-width: 320px;
+        min-width: 180px;
+        color: var(--muted);
+        line-height: 1.4;
+        font-size: 0.74rem;
+      }
 
       .pill {
         display: inline-block;
@@ -565,6 +572,7 @@
               <td>${fmtDate(c.answered_at)}</td>
               <td>${esc(c.borrower_name)}</td>
               <td>${esc(c.ops_status_label || '—')}${c.ops_ground_truth ? ' <span class="pill">verified</span>' : ''}${c.status_mismatch ? ' <span class="sub">(AI corrected)</span>' : ''}</td>
+              <td class="gist">${esc(c.transcript_gist || '—')}</td>
               <td>${esc(c.reference_code || '—')}</td>
               <td>${esc(c.lo_name || '—')}</td>
               ${c.status_mismatch ? '<td class="sub">Corrected</td>' : '<td>—</td>'}
@@ -576,7 +584,7 @@
           <details>
             <summary class="appendix-toggle">Call-level detail (${calls.length} calls)</summary>
             <table class="detail-table">
-              <thead><tr><th>Date</th><th>Borrower</th><th>Status</th><th>Offer</th><th>LO</th><th>AI fix</th></tr></thead>
+              <thead><tr><th>Date</th><th>Borrower</th><th>Status</th><th>Transcript gist</th><th>Offer</th><th>LO</th><th>AI fix</th></tr></thead>
               <tbody>${rows}</tbody>
             </table>
           </details>
