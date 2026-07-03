@@ -13,6 +13,7 @@
 import { buildDispositionEmail } from '../lib/disposition-email.js';
 import { resolveInboundLo } from '../lib/shape/inbound-lo-roster.js';
 import { updateShapeLeadFields } from '../lib/shape/client.js';
+import { postJsonToZapier } from '../lib/email/zapier-webhook.js';
 
 const SAMPLE = {
   shapeLeadId: '47568',
@@ -81,10 +82,8 @@ if (sendZap) {
     console.error('\nSet ZAPIER_EMAIL_WEBHOOK_URL to send to Zapier.');
     process.exit(1);
   }
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(zapPayload),
+  const res = await postJsonToZapier(url, zapPayload, {
+    excludeFromQuery: ['email_html', 'email_body'],
   });
   const text = await res.text();
   console.log('\n--- Zapier ---');

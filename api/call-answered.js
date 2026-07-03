@@ -192,6 +192,8 @@ export default async function handler(req, res) {
             email_from_name: disposition.email_from_name,
             email_from_display: disposition.email_from_display,
             contact_found: result.contact_found,
+            lead_name: result.full_name,
+            lead_phone: result.formatted_phone,
           },
         });
 
