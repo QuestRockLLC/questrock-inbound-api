@@ -482,6 +482,72 @@
         font-size: 0.82rem;
         padding: 0.35rem 0.75rem;
       }
+      .create-call-panel {
+        margin: 0 0 1rem;
+        padding: 0.85rem 1rem;
+        background: rgba(15, 23, 42, 0.55);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+      }
+      .create-call-panel summary {
+        cursor: pointer;
+        color: #7dd3fc;
+        font-weight: 600;
+        font-size: 0.9rem;
+        user-select: none;
+      }
+      .create-call-panel .hint {
+        margin: 0.5rem 0 0.75rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+      .create-call-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 0.55rem 0.75rem;
+        margin-top: 0.65rem;
+      }
+      .create-call-grid label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+      .create-call-grid input,
+      .create-call-grid select {
+        padding: 0.4rem 0.55rem;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: #1e293b;
+        color: #e2e8f0;
+        font-size: 0.82rem;
+      }
+      .create-call-actions {
+        display: flex;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-top: 0.75rem;
+      }
+      .create-call-actions label.inline {
+        flex-direction: row;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+      button.create-call-submit {
+        background: rgba(56, 189, 248, 0.15);
+        border-color: rgba(56, 189, 248, 0.45);
+        color: #7dd3fc;
+        font-size: 0.85rem;
+        padding: 0.4rem 0.9rem;
+      }
+      .create-call-msg { font-size: 0.8rem; color: var(--muted); }
+      .create-call-msg.ok { color: #86efac; }
+      .create-call-msg.err { color: #fca5a5; }
       button.open-shape {
         background: rgba(251, 113, 133, 0.15);
         border-color: rgba(251, 113, 133, 0.45);
@@ -589,6 +655,43 @@
         <button type="button" class="state-filter" data-state="TN">TN</button>
         <button type="button" class="state-filter" data-state="TX">TX</button>
       </div>
+
+      <details class="create-call-panel" id="create-call-panel">
+        <summary>Add missing call (Zoom import or manual)</summary>
+        <p class="hint">
+          Calls appear in Call Tracker only after <code>/api/call-answered</code> runs (Zoom → Zapier → inbound API).
+          If your test call is in Zoom but not here, import it below — paste the Zoom <strong>Call ID</strong> from Call History,
+          or fill in borrower + LO manually.
+        </p>
+        <div class="create-call-grid">
+          <label style="grid-column: 1 / -1">
+            Zoom Call ID
+            <input type="text" id="create-zoom-call-id" placeholder="e.g. 7652451507461830788" />
+          </label>
+          <label>Borrower name<input type="text" id="create-caller-name" placeholder="Arsalan Rashid" /></label>
+          <label>Borrower phone<input type="tel" id="create-caller-phone" placeholder="7735551234" /></label>
+          <label>LO who answered<input type="text" id="create-lo-name" placeholder="Nikk Smith" /></label>
+          <label>Queue / line<input type="text" id="create-queue-name" placeholder="Georgia Landing Page L1" /></label>
+          <label>Landing state
+            <select id="create-landing-state">
+              <option value="">— auto —</option>
+              <option value="FL">FL</option>
+              <option value="GA" selected>GA</option>
+              <option value="NC">NC</option>
+              <option value="SC">SC</option>
+              <option value="TN">TN</option>
+              <option value="TX">TX</option>
+            </select>
+          </label>
+          <label>Call time (optional)<input type="datetime-local" id="create-timestamp" /></label>
+        </div>
+        <div class="create-call-actions">
+          <button type="button" class="create-call-submit" id="create-call-submit">Import call</button>
+          <label class="inline"><input type="checkbox" id="create-fetch-transcript" checked /> Fetch transcript from Zoom</label>
+          <label class="inline"><input type="checkbox" id="create-send-disposition" /> Send LO disposition email</label>
+          <span class="create-call-msg" id="create-call-msg"></span>
+        </div>
+      </details>
 
       <p class="meta" id="meta">Loading…</p>
       <div class="list" id="list"></div>
@@ -1648,6 +1751,71 @@
       });
 
       document.getElementById('refresh').addEventListener('click', () => load().catch((e) => alert(e.message)));
+
+      document.getElementById('create-call-submit').addEventListener('click', async () => {
+        const msg = document.getElementById('create-call-msg');
+        const btn = document.getElementById('create-call-submit');
+        const zoomCallId = document.getElementById('create-zoom-call-id')?.value?.trim() ?? '';
+        const callerName = document.getElementById('create-caller-name')?.value?.trim() ?? '';
+        const callerPhone = document.getElementById('create-caller-phone')?.value?.trim() ?? '';
+        const loName = document.getElementById('create-lo-name')?.value?.trim() ?? '';
+        const queueName = document.getElementById('create-queue-name')?.value?.trim() ?? '';
+        const landingState = document.getElementById('create-landing-state')?.value?.trim() ?? '';
+        const tsRaw = document.getElementById('create-timestamp')?.value?.trim() ?? '';
+        const fetchTranscript = document.getElementById('create-fetch-transcript')?.checked ?? true;
+        const sendDisposition = document.getElementById('create-send-disposition')?.checked ?? false;
+
+        if (!zoomCallId && !callerPhone) {
+          msg.textContent = 'Enter a Zoom Call ID or borrower phone.';
+          msg.className = 'create-call-msg err';
+          return;
+        }
+
+        btn.disabled = true;
+        msg.textContent = 'Importing call (Shape + Call Tracker)…';
+        msg.className = 'create-call-msg';
+
+        try {
+          const payload = {
+            fetch_transcript: fetchTranscript,
+            send_disposition_email: sendDisposition,
+          };
+          if (zoomCallId) payload.zoom_call_id = zoomCallId;
+          if (callerName) payload.caller_name = callerName;
+          if (callerPhone) payload.caller_phone = callerPhone;
+          if (loName) payload.lo_name = loName;
+          if (queueName) payload.queue_name = queueName;
+          if (landingState) payload.landing_state = landingState;
+          if (tsRaw) payload.timestamp = new Date(tsRaw).toISOString();
+
+          const data = await InboundAuth.apiPost('/api/call-tracker-create-call', payload);
+          if (data.skipped) {
+            msg.textContent = data.reason || 'Call already exists.';
+            msg.className = 'create-call-msg';
+          } else {
+            const parts = [
+              `Imported #${data.shape_lead_id || '?'}`,
+              data.lo?.display_name ? `LO: ${data.lo.display_name}` : null,
+              data.disposition_send?.sent ? 'Disposition email sent' : null,
+              data.transcript_fetch?.transcript_id || data.transcript_fetch?.ok
+                ? 'Transcript pulled'
+                : data.transcript_fetch?.skipped
+                  ? null
+                  : 'Transcript pending',
+            ].filter(Boolean);
+            msg.textContent = parts.join(' · ') || 'Call imported.';
+            msg.className = 'create-call-msg ok';
+          }
+          openCallId = data.call_id || zoomCallId || null;
+          await load();
+          document.getElementById('create-call-panel').open = false;
+        } catch (err) {
+          msg.textContent = err.message || 'Import failed.';
+          msg.className = 'create-call-msg err';
+        } finally {
+          btn.disabled = false;
+        }
+      });
 
       document.getElementById('toggle-archived').addEventListener('click', () => {
         const btn = document.getElementById('toggle-archived');
