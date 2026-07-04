@@ -184,6 +184,7 @@ export default async function handler(req, res) {
           html: disposition.email_html,
           template: 'lo_disposition',
           meta: {
+            email_phase: 'lo_disposition',
             shape_lead_id: result.shape_lead_id,
             call_id: result.call_id,
             lo_name: result.lo?.display_name || disposition.email_from_name,
@@ -194,6 +195,8 @@ export default async function handler(req, res) {
             contact_found: result.contact_found,
             lead_name: result.full_name,
             lead_phone: result.formatted_phone,
+            ai_status_label: disposition.ai_status_label,
+            ai_suggested_slug: disposition.ai_suggested_slug,
           },
         });
 

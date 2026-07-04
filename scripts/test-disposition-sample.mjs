@@ -13,7 +13,7 @@
 import { buildDispositionEmail } from '../lib/disposition-email.js';
 import { resolveInboundLo } from '../lib/shape/inbound-lo-roster.js';
 import { updateShapeLeadFields } from '../lib/shape/client.js';
-import { postJsonToZapier } from '../lib/email/zapier-webhook.js';
+import { postToZapierCatchHook } from '../lib/email/zapier-webhook.js';
 
 const SAMPLE = {
   shapeLeadId: '47568',
@@ -55,6 +55,7 @@ const zapPayload = {
   email_from_name: disposition.email_from_name,
   email_from_display: disposition.email_from_display,
   template: 'lo_disposition',
+  email_phase: 'lo_disposition',
   source: 'questrock-inbound-api-test',
   shape_lead_id: SAMPLE.shapeLeadId,
   call_id: `test-${SAMPLE.shapeLeadId}-manual`,
@@ -62,6 +63,7 @@ const zapPayload = {
   lo_email: lo.email,
   lead_name: `${SAMPLE.firstName} ${SAMPLE.lastName}`,
   lead_phone: '(773) 555-9876',
+  ai_status_label: SAMPLE.aiStatusLabel,
 };
 
 console.log('--- Zap payload (map in Zapier: To, Subject, Body, From) ---');
@@ -82,9 +84,7 @@ if (sendZap) {
     console.error('\nSet ZAPIER_EMAIL_WEBHOOK_URL to send to Zapier.');
     process.exit(1);
   }
-  const res = await postJsonToZapier(url, zapPayload, {
-    excludeFromQuery: ['email_html', 'email_body'],
-  });
+  const res = await postToZapierCatchHook(url, zapPayload);
   const text = await res.text();
   console.log('\n--- Zapier ---');
   console.log('status:', res.status);
