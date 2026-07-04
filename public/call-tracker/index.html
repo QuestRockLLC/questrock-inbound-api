@@ -796,6 +796,22 @@
         return copySection(`Extracted Shape fields (${fields.length})`, text);
       }
 
+      function renderDispositionEmailBlock(c) {
+        if (!c.shape_lead_id || c.is_shape_arrival) return '';
+        if (!c.lo_name && !c.lo_email) return '';
+        const sentAt = c.disposition_email_sent_at;
+        const btnLabel = sentAt ? 'Resend LO disposition email' : 'Send LO disposition email to LO';
+        const hint = sentAt
+          ? `Sent ${fmtTime(sentAt)} ET · via Zapier`
+          : c.pending_disposition
+            ? 'Pending auto-send — click to send now'
+            : 'Not sent yet — Zapier → Outlook with status buttons';
+        return `<div class="refetch-row disposition-email-row">
+          <button type="button" class="disposition-email-send" data-call-id="${esc(c.call_id)}" data-already-sent="${sentAt ? '1' : '0'}">${btnLabel}</button>
+          <span class="refetch-msg${sentAt ? ' ok' : ''}" data-disposition-email-msg="${esc(c.call_id)}">${esc(hint)}</span>
+        </div>`;
+      }
+
       function renderLoDispositionBlock(c) {
         if (!c.lo_disposition_label) return '';
         const loSync = c.lo_disposition_shape_sync;
@@ -854,6 +870,15 @@
           ? `<button type="button" class="manage-btn warn" data-manage-action="unarchive" data-call-id="${esc(c.call_id)}">Restore from archive</button>`
           : `<button type="button" class="manage-btn warn" data-manage-action="archive" data-call-id="${esc(c.call_id)}">Archive call</button>`;
 
+        const dispositionEmailManageRow =
+          c.shape_lead_id && !c.is_shape_arrival && (c.lo_name || c.lo_email)
+            ? `<div class="manage-row">
+            <label>LO disposition email</label>
+            <button type="button" class="manage-btn disposition-email-send" data-call-id="${esc(c.call_id)}" data-already-sent="${c.disposition_email_sent_at ? '1' : '0'}">${c.disposition_email_sent_at ? 'Resend to LO' : 'Send to LO'}</button>
+            <span class="manage-msg" data-disposition-email-msg="${esc(c.call_id)}">${c.disposition_email_sent_at ? `Sent ${fmtTime(c.disposition_email_sent_at)} ET` : 'Zapier → Outlook'}</span>
+          </div>`
+            : '';
+
         return `<section class="manage-panel" onclick="event.stopPropagation()">
           <h3>Manage call</h3>
           <div class="manage-row">
@@ -876,6 +901,7 @@
             <button type="button" class="manage-btn" data-manage-action="update_lo_status" data-call-id="${esc(c.call_id)}">Update LO status</button>
             <span class="manage-msg" data-manage-msg="lo-${esc(c.call_id)}"></span>
           </div>
+          ${dispositionEmailManageRow}
           <div class="manage-row">
             ${archiveBtn}
             <button type="button" class="manage-btn danger" data-manage-action="delete" data-call-id="${esc(c.call_id)}">Delete permanently</button>
@@ -1037,6 +1063,7 @@
             <div class="time">${fmtTime(c.answered_at)} ET</div>
           </div>
           <div class="call-body" onclick="event.stopPropagation()">
+            ${renderDispositionEmailBlock(c)}
             ${renderManagePanel(c)}
             ${mailerLinkBlock}
             ${copyActions}
@@ -1107,6 +1134,52 @@
               const chev = el.querySelector('.chevron');
               if (chev) chev.textContent = el.dataset.callId === openCallId ? '▾' : '▸';
             });
+          });
+        });
+      }
+
+      function bindDispositionEmailHandlers() {
+        document.querySelectorAll('button.disposition-email-send').forEach((btn) => {
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const callId = btn.dataset.callId;
+            const alreadySent = btn.dataset.alreadySent === '1';
+            if (alreadySent) {
+              const ok = window.confirm(
+                'Resend disposition email to the LO? They will receive another copy with status buttons.',
+              );
+              if (!ok) return;
+            }
+            const msg = document.querySelector(`[data-disposition-email-msg="${callId}"]`);
+            btn.disabled = true;
+            if (msg) {
+              msg.textContent = 'Sending via Zapier…';
+              msg.className = 'refetch-msg';
+            }
+            try {
+              const data = await InboundAuth.apiPost('/api/call-tracker-send-disposition-email', {
+                call_id: callId,
+                force: alreadySent,
+              });
+              if (msg) {
+                msg.textContent = data.sent
+                  ? `Sent to ${data.email_to || data.lo_email || 'LO'}`
+                  : data.reason || 'Not sent';
+                msg.className = data.sent ? 'refetch-msg ok' : 'refetch-msg err';
+              }
+              if (data.sent) {
+                await load();
+                openCallId = callId;
+              } else {
+                btn.disabled = false;
+              }
+            } catch (err) {
+              if (msg) {
+                msg.textContent = err.message || 'Send failed.';
+                msg.className = 'refetch-msg err';
+              }
+              btn.disabled = false;
+            }
           });
         });
       }
@@ -1536,6 +1609,7 @@
         bindExpandHandlers();
         bindRefetchHandlers();
         bindAnalyzeHandlers();
+        bindDispositionEmailHandlers();
         bindLoDispositionSyncHandlers();
         bindCopyHandlers();
         bindPasteHandlers();

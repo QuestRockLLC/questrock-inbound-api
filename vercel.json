@@ -37,6 +37,9 @@
     "api/call-tracker-manage.js": {
       "maxDuration": 30
     },
+    "api/call-tracker-send-disposition-email.js": {
+      "maxDuration": 30
+    },
     "api/questmail-weekly-report.js": {
       "maxDuration": 60
     },
