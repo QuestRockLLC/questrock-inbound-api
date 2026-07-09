@@ -25,6 +25,7 @@ export default async function handler(req, res) {
       reprocessLimit: Number(body?.reprocess_limit ?? 100),
       callIds: Array.isArray(body?.call_ids) ? body.call_ids.map(String) : null,
       transcripts: Array.isArray(body?.transcripts) ? body.transcripts : null,
+      skipEmail: Boolean(body?.skip_email ?? body?.no_email),
     });
 
     return sendJson(res, 200, { ok: true, ...report });
