@@ -859,11 +859,30 @@
         ['CONVERSION MOVE', 'conversion_move'],
       ];
 
+      function sanitizeLoCoachingDisplay(text) {
+        if (!text || typeof text !== 'string') return text;
+        return text
+          .replace(/LO Coaching\s*[—–-]\s*Ray's Playbook\s*(?:\([^)]*\))?/gi, 'LO Coaching — QuestRock AI')
+          .replace(/Ray's Playbook/gi, 'QuestRock AI Playbook')
+          .replace(/RAY OUTCOME CODE/g, 'QUESTROCK AI OUTCOME CODE')
+          .replace(/RAY SCRIPT TO DEPLOY/g, 'SCRIPT TO DEPLOY')
+          .replace(/Ray Conway's voice/gi, 'QuestRock advisor tone')
+          .replace(/Ray Conway/gi, 'QuestRock AI')
+          .replace(/Ray coaching/gi, 'QuestRock AI coaching')
+          .replace(/Ray doctrine/gi, 'QuestRock sales doctrine')
+          .replace(/Ray outcome code/gi, 'QuestRock AI outcome code')
+          .replace(/Ray scorecard/gi, 'QuestRock scorecard')
+          .replace(/Ray delivery/gi, 'QuestRock delivery')
+          .replace(/RAY CONWAY\s*\/\s*QUESTROCK/gi, 'QUESTROCK')
+          .replace(/^RAY CONWAY/gm, 'QUESTROCK');
+      }
+
       function formatRayCoachingText(rayCoaching) {
         if (!rayCoaching || typeof rayCoaching !== 'object') return '';
-        return RAY_COACHING_SECTIONS.filter(([, key]) => String(rayCoaching[key] ?? '').trim())
+        const text = RAY_COACHING_SECTIONS.filter(([, key]) => String(rayCoaching[key] ?? '').trim())
           .map(([title, key]) => `${title}:\n${String(rayCoaching[key]).trim()}`)
           .join('\n\n');
+        return sanitizeLoCoachingDisplay(text);
       }
 
       function renderPanelCopyHead(title, copyText, copyId) {
@@ -967,7 +986,7 @@
 
       function renderLoCoaching(rayCoaching, salesNotesFallback, copyId = 'lo-coaching') {
         const structuredText = formatRayCoachingText(rayCoaching);
-        const legacyText = String(salesNotesFallback ?? '').trim();
+        const legacyText = sanitizeLoCoachingDisplay(String(salesNotesFallback ?? '').trim());
         const text = structuredText || legacyText;
         if (!text) return '';
 
@@ -976,20 +995,20 @@
             String(rayCoaching[key] ?? '').trim(),
           )
             .map(([title, key]) => {
-              const content = String(rayCoaching[key]).trim();
+              const content = sanitizeLoCoachingDisplay(String(rayCoaching[key]).trim());
               const inner = title === 'FIELD SCORECARD' ? `<pre>${esc(content)}</pre>` : `<p>${esc(content)}</p>`;
               return `<div class="qr-coaching-section"><h4>${esc(title)}</h4>${inner}</div>`;
             })
             .join('');
 
           return `<section class="copy-section qr-coaching-wrap">
-            ${renderPanelCopyHead('QuestRock AI Score · LO coaching', structuredText, copyId)}
+            ${renderPanelCopyHead('QuestRock AI · LO Coaching', structuredText, copyId)}
             <div class="qr-coaching">${body}</div>
           </section>`;
         }
 
         return `<section class="copy-section qr-coaching-wrap">
-          ${renderPanelCopyHead('QuestRock AI Score · LO coaching', legacyText, copyId)}
+          ${renderPanelCopyHead('QuestRock AI · LO Coaching', legacyText, copyId)}
           <div class="qr-coaching"><pre>${esc(legacyText)}</pre></div>
         </section>`;
       }
@@ -1002,7 +1021,7 @@
         if (c.call_summary) parts.push(`\n--- Call summary ---\n${c.call_summary}`);
         if (c.status_rationale) parts.push(`\n--- Why this status ---\n${c.status_rationale}`);
         const coachingText = formatRayCoachingText(c.ray_coaching) || c.sales_notes;
-        if (coachingText) parts.push(`\n--- QuestRock AI Score · LO Coaching ---\n${coachingText}`);
+        if (coachingText) parts.push(`\n--- QuestRock AI · LO Coaching ---\n${coachingText}`);
         if (c.ops_notes) parts.push(`\n--- Ops Notes ---\n${c.ops_notes}`);
         const fieldsText = formatExtractedFieldsText(c.extracted_fields);
         if (fieldsText) parts.push(`\n--- Extracted Shape Fields ---\n${fieldsText}`);
