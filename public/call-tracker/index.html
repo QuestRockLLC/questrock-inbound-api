@@ -549,17 +549,80 @@
       .create-call-msg.ok { color: #86efac; }
       .create-call-msg.err { color: #fca5a5; }
       button.open-shape {
-        background: rgba(251, 113, 133, 0.15);
-        border-color: rgba(251, 113, 133, 0.45);
-        color: #fda4af;
-        font-size: 0.82rem;
-        font-weight: 600;
-        padding: 0.4rem 0.85rem;
+        background: #ea580c;
+        border: 2px solid #fb923c;
+        color: #fff;
+        font-size: 0.9rem;
+        font-weight: 700;
+        padding: 0.55rem 1.1rem;
         text-decoration: none;
         display: inline-block;
-        border-radius: 999px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(234, 88, 12, 0.35);
       }
-      button.open-shape:hover { background: rgba(251, 113, 133, 0.25); }
+      button.open-shape:hover { background: #c2410c; }
+      a.open-lendingpad {
+        background: rgba(56, 189, 248, 0.18);
+        border: 2px solid rgba(56, 189, 248, 0.5);
+        color: #7dd3fc;
+        font-size: 0.88rem;
+        font-weight: 700;
+        padding: 0.55rem 1rem;
+        text-decoration: none;
+        display: inline-block;
+        border-radius: 10px;
+      }
+      a.offer-code-pill {
+        display: inline-block;
+        background: rgba(34, 197, 94, 0.15);
+        border: 1px solid rgba(34, 197, 94, 0.45);
+        color: #86efac;
+        font-weight: 700;
+        font-size: 0.82rem;
+        padding: 0.45rem 0.85rem;
+        border-radius: 999px;
+        text-decoration: none;
+      }
+      .call-meta-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        align-items: center;
+        margin: 0.65rem 0 0.35rem;
+      }
+      .call-meta-bar .meta-chip {
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 0.35rem 0.65rem;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(15, 23, 42, 0.55);
+        color: #cbd5e1;
+      }
+      .call-meta-bar .meta-chip strong { color: #f8fafc; font-weight: 700; }
+      .call-meta-bar .meta-chip.lo { border-color: rgba(148, 163, 184, 0.5); }
+      .call-meta-bar .meta-chip.shape { border-color: rgba(251, 146, 60, 0.55); }
+      .call-meta-bar .meta-chip.lp { border-color: rgba(56, 189, 248, 0.45); }
+      .call-meta-bar .meta-chip.source { border-color: rgba(167, 139, 250, 0.45); }
+      .call-meta-bar .meta-chip.offer { border-color: rgba(34, 197, 94, 0.45); }
+      .call-action-row { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-top: 0.65rem; align-items: center; }
+      .loan-details-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 0.55rem;
+        margin-top: 0.5rem;
+      }
+      .loan-details-grid div {
+        background: rgba(15, 23, 42, 0.45);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.45rem 0.6rem;
+        font-size: 0.82rem;
+      }
+      .loan-details-grid span { display: block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.15rem; }
+      button.open-shape-old {
       .manage-panel {
         margin-bottom: 1rem;
         padding: 1rem;
@@ -781,14 +844,14 @@
       const RAY_COACHING_SECTIONS = [
         ['ONE-LINE VERDICT', 'one_line_verdict'],
         ['CALL PHASE', 'call_phase'],
-        ['RAY OUTCOME CODE', 'ray_outcome_code'],
+        ['QUESTROCK AI SCORE', 'ray_outcome_code'],
         ['FIELD SCORECARD', 'field_scorecard'],
         ['FIRST CALL SCORE', 'first_call_score'],
         ['KPI SCORE', 'kpi_score'],
         ['DONE WELL', 'done_well'],
         ['FIX NOW', 'fix_now'],
         ['SAY THIS NEXT', 'say_this_next'],
-        ['RAY SCRIPT TO DEPLOY', 'ray_script'],
+        ['SCRIPT TO DEPLOY', 'ray_script'],
         ['MISSED ON THIS CALL', 'missed_on_call'],
         ['PROGRAM FIT', 'program_fit'],
         ['TURNDOWN / SALVAGE REVIEW', 'turndown_salvage'],
@@ -812,6 +875,70 @@
         </div>`;
       }
 
+      function renderBorrowerLoanDetails(analysis) {
+        const details = analysis?.borrower_loan_details;
+        if (!details || typeof details !== 'object') return '';
+        const rows = [
+          ['Mortgage balance', details.mortgage_balance],
+          ['Property value', details.property_value],
+          ['Interest rate', details.interest_rate],
+          ['Term', details.loan_term],
+          ['Years left', details.years_remaining],
+          ['PMI', details.pmi],
+          ['Homeowners insurance', details.homeowners_insurance],
+          ['HOI period', details.hoi_period],
+          ['Property tax', details.property_tax],
+          ['Tax period', details.property_tax_period],
+          ['Flood insurance', details.flood_insurance],
+          ['Flood period', details.flood_period],
+        ].filter(([, v]) => String(v ?? '').trim());
+        if (!rows.length) return '';
+        const body = rows
+          .map(([label, value]) => `<div><span>${esc(label)}</span>${esc(String(value).trim())}</div>`)
+          .join('');
+        return `<section class="copy-section loan-details-wrap">
+          <h3>Borrower&apos;s loan details</h3>
+          <div class="loan-details-grid">${body}</div>
+        </section>`;
+      }
+
+      function renderCallMetaBar(c) {
+        const chips = [];
+        chips.push(`<span class="meta-chip lo">LO assigned · <strong>${esc(c.lo_name || 'Unassigned')}</strong></span>`);
+        if (c.shape_lead_id) {
+          chips.push(`<span class="meta-chip shape">Shape · <strong>${esc(c.crm_status_label || c.lead_status_label || '—')}</strong></span>`);
+        }
+        if (c.lendingpad_url) {
+          chips.push(`<span class="meta-chip lp">LendingPad · <strong>Open file</strong></span>`);
+        }
+        const source = c.shape_source_label || c.channel_label || 'Inbound';
+        chips.push(`<span class="meta-chip source">Lead source · <strong>${esc(source)}</strong></span>`);
+        if (c.reference_code) {
+          chips.push(`<span class="meta-chip offer">Offer · <strong>${esc(c.reference_code)}</strong></span>`);
+        }
+        return `<div class="call-meta-bar">${chips.join('')}</div>`;
+      }
+
+      function renderCallActionRow(c) {
+        const parts = [];
+        if (c.shape_url) {
+          parts.push(
+            `<a class="open-shape" href="${c.shape_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open in Shape #${esc(c.shape_lead_id)}</a>`,
+          );
+        }
+        if (c.lendingpad_url) {
+          parts.push(
+            `<a class="open-lendingpad" href="${c.lendingpad_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open in LendingPad</a>`,
+          );
+        }
+        if (c.mailer_desk_url && c.reference_code) {
+          parts.push(
+            `<a class="offer-code-pill" href="${c.mailer_desk_url}" onclick="event.stopPropagation()">Offer ${esc(c.reference_code)}</a>`,
+          );
+        }
+        return parts.length ? `<div class="call-action-row">${parts.join('')}</div>` : '';
+      }
+
       function renderQuestRockAnalysis(analysis, copyId = 'qr-analysis') {
         const text = formatQuestRockAnalysisText(analysis);
         if (!text) return '';
@@ -831,7 +958,7 @@
           .join('');
 
         return `<section class="copy-section qr-analysis-wrap">
-          ${renderPanelCopyHead('QuestRock AI · Call analysis', text, copyId)}
+            ${renderPanelCopyHead("QuestRock AI Score · Call analysis", text, copyId)}
           <div class="qr-analysis">
             ${body}
           </div>
@@ -856,13 +983,13 @@
             .join('');
 
           return `<section class="copy-section qr-coaching-wrap">
-            ${renderPanelCopyHead("LO Coaching · Ray's playbook", structuredText, copyId)}
+            ${renderPanelCopyHead('QuestRock AI Score · LO coaching', structuredText, copyId)}
             <div class="qr-coaching">${body}</div>
           </section>`;
         }
 
         return `<section class="copy-section qr-coaching-wrap">
-          ${renderPanelCopyHead("LO Coaching · Ray's playbook", legacyText, copyId)}
+          ${renderPanelCopyHead('QuestRock AI Score · LO coaching', legacyText, copyId)}
           <div class="qr-coaching"><pre>${esc(legacyText)}</pre></div>
         </section>`;
       }
@@ -875,7 +1002,7 @@
         if (c.call_summary) parts.push(`\n--- Call summary ---\n${c.call_summary}`);
         if (c.status_rationale) parts.push(`\n--- Why this status ---\n${c.status_rationale}`);
         const coachingText = formatRayCoachingText(c.ray_coaching) || c.sales_notes;
-        if (coachingText) parts.push(`\n--- LO Coaching (Ray's Playbook) ---\n${coachingText}`);
+        if (coachingText) parts.push(`\n--- QuestRock AI Score · LO Coaching ---\n${coachingText}`);
         if (c.ops_notes) parts.push(`\n--- Ops Notes ---\n${c.ops_notes}`);
         const fieldsText = formatExtractedFieldsText(c.extracted_fields);
         if (fieldsText) parts.push(`\n--- Extracted Shape Fields ---\n${fieldsText}`);
@@ -1014,11 +1141,12 @@
       }
 
       function renderCall(c) {
-        const statusStyle = c.ai_status_color
+        const statusStyle = c.ai_status_color && !c.lo_disposition_label
           ? ` style="background:${esc(c.ai_status_color)};color:#fff"`
           : '';
-        const statusBadge = c.ai_status_label
-          ? `<span class="badge status" title="QuestRock AI"${statusStyle}>QuestRock AI: ${esc(c.ai_status_label)}</span>`
+        const displayStatus = c.crm_status_label || c.ai_status_label;
+        const statusBadge = displayStatus
+          ? `<span class="badge status" title="${esc(c.crm_status_source === 'lo_disposition' ? 'LO disposition (posted to Shape)' : c.crm_status_source === 'shape' ? 'Shape CRM status' : 'QuestRock AI Score')}"${statusStyle}>QuestRock AI Score: ${esc(displayStatus)}</span>`
           : c.pending_disposition
             ? `<span class="badge pending">Disposition email pending</span>`
             : `<span class="badge pending">${
@@ -1033,9 +1161,11 @@
                     : 'AI processing'
             }</span>`;
 
-        const loDispositionBadge = c.lo_disposition_label
-          ? `<span class="badge lo-disposition${c.lo_disposition_mismatch ? ' mismatch' : ''}" title="LO selected">LO: ${esc(c.lo_disposition_label)}</span>`
-          : '';
+        const loDispositionBadge = c.lo_disposition_label && c.ai_status_label && c.lo_disposition_label !== c.ai_status_label
+          ? `<span class="badge lo-disposition${c.lo_disposition_mismatch ? ' mismatch' : ''}" title="LO disposition posted to Shape">LO posted: ${esc(c.lo_disposition_label)}</span>`
+          : c.lo_disposition_label
+            ? `<span class="badge lo-disposition" title="LO disposition posted to Shape">LO posted: ${esc(c.lo_disposition_label)}</span>`
+            : '';
 
         const landingBadge = c.landing_page_label
           ? `<span class="badge landing">${esc(c.landing_page_label)}</span>`
@@ -1044,17 +1174,10 @@
         const utm = c.utm_campaign ? ` · UTM ${esc(c.utm_campaign)}` : '';
         const dialed = c.dialed_number_display ? ` · Dialed ${esc(c.dialed_number_display)}` : '';
 
-        const links = [];
-        if (c.shape_url) {
-          links.push(
-            `<a class="open-shape" href="${c.shape_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open in Shape #${esc(c.shape_lead_id)}</a>`,
-          );
-        }
-        if (c.mailer_desk_url) links.push(`<a href="${c.mailer_desk_url}" onclick="event.stopPropagation()">Offer ${esc(c.reference_code)}</a>`);
-
         const loDispositionSection = renderLoDispositionBlock(c);
         const copyPrefix = `copy-${c.call_id}`;
         const questRockAnalysis = renderQuestRockAnalysis(c.questrock_analysis, `${copyPrefix}-qr`);
+        const borrowerLoanDetails = renderBorrowerLoanDetails(c.questrock_analysis);
         const summaryFallback =
           !formatQuestRockAnalysisText(c.questrock_analysis) && c.call_summary
             ? copySection('Call summary (QuestRock AI)', c.call_summary)
@@ -1154,14 +1277,12 @@
               ${loDispositionBadge}
               <h2>${esc(c.borrower_name)} <span class="chevron">${isOpen ? '▾' : '▸'}</span></h2>
               <div class="phone">${esc(c.phone || 'No phone')}</div>
+              ${renderCallMetaBar(c)}
+              ${renderCallActionRow(c)}
               <div class="details">
-                LO: <strong>${esc(c.lo_name || 'Unassigned')}</strong>
-                ${c.contact_found ? ' · Existing lead' : ' · New lead'}
-                ${c.reference_code ? ` · Code ${esc(c.reference_code)}` : ''}
+                ${c.contact_found ? 'Existing lead' : 'New lead'}
                 ${utm}${dialed}
-                ${c.lead_status_label ? ` · Shape: ${esc(c.lead_status_label)}` : ''}
               </div>
-              ${links.length ? `<div class="links">${links.join('')}</div>` : ''}
             </div>
             <div class="time">${fmtTime(c.answered_at)} ET</div>
           </div>
@@ -1171,6 +1292,7 @@
             ${mailerLinkBlock}
             ${copyActions}
             ${loDispositionSection}
+            ${borrowerLoanDetails}
             ${questRockAnalysis || summaryFallback}
             ${loCoaching}
             ${rationale}
