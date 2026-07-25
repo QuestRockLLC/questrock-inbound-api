@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    assertInboundSession(req, { requireCallTracker: true });
+    const session = assertInboundSession(req, { requireCallTracker: true });
 
     const state = String(req.query?.state ?? '').trim().toUpperCase() || null;
     const hours = Number(req.query?.hours ?? 24);
@@ -26,6 +26,7 @@ export default async function handler(req, res) {
       limit: Number.isFinite(limit) ? limit : 80,
       includeArchived: req.query?.include_archived === '1',
       archivedOnly: req.query?.archived_only === '1',
+      viewerEmail: session.email,
     });
 
     return sendJson(res, 200, { ok: true, ...result });

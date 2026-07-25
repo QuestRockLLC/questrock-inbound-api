@@ -196,6 +196,44 @@
         color: #e2e8f0;
         white-space: pre-wrap;
       }
+      .deal-review-wrap .deal-review-badge {
+        display: inline-block;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0.2rem 0.55rem;
+        border-radius: 999px;
+        margin-right: 0.35rem;
+        background: rgba(167, 139, 250, 0.2);
+        color: #c4b5fd;
+      }
+      .deal-review-wrap .deal-review-badge.review-required {
+        background: rgba(245, 158, 11, 0.2);
+        color: #fcd34d;
+      }
+      .identity-flags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 0.5rem 0 0.75rem;
+      }
+      .identity-flag {
+        font-size: 0.78rem;
+        padding: 0.25rem 0.55rem;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: #0f172a;
+        color: #94a3b8;
+      }
+      .identity-flag.verified { border-color: rgba(34, 197, 94, 0.4); color: #86efac; }
+      .identity-flag.needs { border-color: rgba(245, 158, 11, 0.4); color: #fcd34d; }
+      .identity-flag.missing { opacity: 0.7; }
+      .transcript-admin-note {
+        font-size: 0.78rem;
+        color: #fcd34d;
+        margin-bottom: 0.35rem;
+      }
       .field-list {
         margin: 0;
         padding: 0;
@@ -984,6 +1022,116 @@
         </section>`;
       }
 
+      const DEAL_CLASS_LABELS = {
+        standard: 'Standard',
+        non_qm: 'Non-QM',
+        construction: 'Construction',
+        investor_spec: 'Investor / Spec',
+        dscr: 'DSCR',
+        reverse: 'Reverse',
+        commercial: 'Commercial',
+        complex: 'Complex',
+        a_team_review: 'A-Team Review',
+        insufficient_info: 'Insufficient Info',
+      };
+
+      function formatIdentityState(state) {
+        if (state === 'verified') return 'Verified';
+        if (state === 'needs_verification') return 'Needs verification';
+        return 'Not found';
+      }
+
+      function renderPrivateIdentityFlags(identity) {
+        if (!identity) return '';
+        const ssn = identity.ssn ?? {};
+        const dob = identity.dob ?? {};
+        const ssnCls =
+          ssn.state === 'verified' ? 'verified' : ssn.state === 'needs_verification' ? 'needs' : 'missing';
+        const dobCls =
+          dob.state === 'verified' ? 'verified' : dob.state === 'needs_verification' ? 'needs' : 'missing';
+        const ssnDetail =
+          ssn.state === 'verified'
+            ? 'SSN: verified (private Shape field)'
+            : ssn.state === 'needs_verification'
+              ? `SSN: last four ····${esc(ssn.last_four || '????')} — needs verification`
+              : 'SSN: not found on call';
+        const dobDetail =
+          dob.state === 'verified'
+            ? 'DOB: verified (private Shape field)'
+            : dob.state === 'needs_verification'
+              ? 'DOB: mentioned — needs verification'
+              : 'DOB: not found on call';
+        return `<div class="identity-flags">
+          <span class="identity-flag ${ssnCls}">${ssnDetail}</span>
+          <span class="identity-flag ${dobCls}">${dobDetail}</span>
+        </div>`;
+      }
+
+      function formatDealReviewText(dr) {
+        if (!dr || typeof dr !== 'object') return '';
+        const cls = dr.classification ?? {};
+        const parts = [];
+        parts.push(`Deal Review v${dr.schema_version || '1.0'}`);
+        parts.push(
+          `Classification: ${DEAL_CLASS_LABELS[cls.recommended] || cls.recommended || '—'} · Routing: ${cls.routing || '—'}${cls.human_review_required ? ' · Human review required' : ''}`,
+        );
+        if (dr.confidence?.rationale) parts.push(`Confidence: ${dr.confidence.classification} — ${dr.confidence.rationale}`);
+        if (dr.borrower_objective) parts.push(`\nObjective:\n${dr.borrower_objective}`);
+        if (dr.loan_purpose) parts.push(`Loan purpose: ${dr.loan_purpose}`);
+        if (dr.strengths?.length) parts.push(`\nStrengths:\n- ${dr.strengths.join('\n- ')}`);
+        if (dr.risks_and_contradictions?.length) {
+          parts.push(`\nRisks:\n- ${dr.risks_and_contradictions.join('\n- ')}`);
+        }
+        if (dr.missing_information?.length) {
+          parts.push(`\nMissing:\n- ${dr.missing_information.join('\n- ')}`);
+        }
+        if (dr.recommended_follow_up) parts.push(`\nFollow-up:\n${dr.recommended_follow_up}`);
+        return parts.join('\n').trim();
+      }
+
+      function renderDealReview(dealReview, copyId = 'deal-review') {
+        if (!dealReview || typeof dealReview !== 'object') return '';
+        const text = formatDealReviewText(dealReview);
+        const cls = dealReview.classification ?? {};
+        const classLabel = DEAL_CLASS_LABELS[cls.recommended] || cls.recommended || '—';
+        const reviewBadge = cls.human_review_required
+          ? '<span class="deal-review-badge review-required">Human review required</span>'
+          : '';
+        const sections = [
+          ['Overview', [dealReview.borrower_objective, dealReview.loan_purpose, dealReview.occupancy_intent].filter(Boolean).join(' · ')],
+          ['Borrower profile', Object.values(dealReview.borrower_profile ?? {}).filter((v) => String(v).trim()).join(' · ')],
+          ['Transaction', Object.values(dealReview.transaction ?? {}).filter((v) => String(v).trim() && v !== 'Not stated').slice(0, 6).join(' · ')],
+          ['Preliminary calculations', dealReview.preliminary_calculations?.ltv?.value
+            ? `LTV: ${dealReview.preliminary_calculations.ltv.value} (${dealReview.preliminary_calculations.ltv.label || 'unverified'})`
+            : ''],
+          ['Strengths', (dealReview.strengths ?? []).join('; ')],
+          ['Risks & contradictions', (dealReview.risks_and_contradictions ?? []).join('; ')],
+          ['Missing information', (dealReview.missing_information ?? []).join('; ')],
+          ['Required documents', (dealReview.required_documents ?? []).join('; ')],
+          ['Follow-up', dealReview.recommended_follow_up],
+        ].filter(([, body]) => String(body ?? '').trim());
+
+        const body = sections
+          .map(
+            ([title, content]) =>
+              `<div class="qr-analysis-section"><h4>${esc(title)}</h4><p>${esc(String(content).trim())}</p></div>`,
+          )
+          .join('');
+
+        return `<section class="copy-section deal-review-wrap qr-analysis-wrap">
+          ${renderPanelCopyHead(`Deal Review · ${classLabel}`, text, copyId)}
+          <div class="qr-analysis">
+            <div class="qr-analysis-head">
+              <span class="deal-review-badge">${esc(classLabel)}</span>
+              ${reviewBadge}
+              <strong>${esc(cls.routing || '')}</strong>
+              <span style="color:#94a3b8;font-weight:400;"> · ${esc(dealReview.confidence?.classification || '')} confidence</span>
+            </div>
+            ${body}
+          </div>
+        </section>`;
+      }
+
       function renderLoCoaching(rayCoaching, salesNotesFallback, copyId = 'lo-coaching') {
         const structuredText = formatRayCoachingText(rayCoaching);
         const legacyText = sanitizeLoCoachingDisplay(String(salesNotesFallback ?? '').trim());
@@ -1015,6 +1163,8 @@
 
       function buildAiReviewText(c) {
         const parts = [];
+        const dr = formatDealReviewText(c.deal_review);
+        if (dr) parts.push(`--- Deal Review ---\n${dr}`);
         const qr = formatQuestRockAnalysisText(c.questrock_analysis);
         if (qr) parts.push(`--- QuestRock AI Analysis ---\n${qr}`);
         if (c.ai_status_label) parts.push(`Status: ${c.ai_status_label}`);
@@ -1195,6 +1345,9 @@
 
         const loDispositionSection = renderLoDispositionBlock(c);
         const copyPrefix = `copy-${c.call_id}`;
+        const identityFlags = renderPrivateIdentityFlags(c.private_identity);
+        const dealReviewPanel = renderDealReview(c.deal_review, `${copyPrefix}-dr`);
+        const dealReviewSync = c.deal_review_sync ? renderShapeSync(c.deal_review_sync) : '';
         const questRockAnalysis = renderQuestRockAnalysis(c.questrock_analysis, `${copyPrefix}-qr`);
         const borrowerLoanDetails = renderBorrowerLoanDetails(c.questrock_analysis);
         const summaryFallback =
@@ -1276,8 +1429,11 @@
             </section>`
           : '';
 
+        const transcriptAdminNote = c.transcript_unredacted
+          ? '<p class="transcript-admin-note">Admin view — full transcript (SSN/DOB not redacted)</p>'
+          : '';
         const transcript = c.transcript_text
-          ? `<section class="copy-section"><div class="section-head"><h3>Transcript</h3>${copyBtn('Copy')}</div>${analyzeBlock}<pre class="copy-block transcript-block">${esc(c.transcript_text)}</pre></section>`
+          ? `<section class="copy-section"><div class="section-head"><h3>Transcript</h3>${copyBtn('Copy')}</div>${transcriptAdminNote}${analyzeBlock}<pre class="copy-block transcript-block">${esc(c.transcript_text)}</pre></section>`
           : c.transcript_state === 'awaiting_call'
             ? `<section><h3>Transcript</h3><p class="details">Lead arrived from Shape — paste the call transcript once the borrower calls in.</p>${pastePanel}</section>`
           : c.transcript_state !== 'pending'
@@ -1311,6 +1467,9 @@
             ${mailerLinkBlock}
             ${copyActions}
             ${loDispositionSection}
+            ${identityFlags}
+            ${dealReviewPanel}
+            ${dealReviewSync}
             ${borrowerLoanDetails}
             ${questRockAnalysis || summaryFallback}
             ${loCoaching}

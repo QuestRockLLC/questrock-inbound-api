@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://questrock.com/schemas/deal-review-v1.json",
+  "title": "Deal Review v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "generated_at",
+    "confidence",
+    "classification",
+    "borrower_objective",
+    "loan_purpose",
+    "occupancy_intent",
+    "borrower_profile",
+    "transaction",
+    "preliminary_calculations",
+    "strengths",
+    "risks_and_contradictions",
+    "missing_information",
+    "required_documents",
+    "lender_direction",
+    "next_borrower_questions",
+    "recommended_follow_up",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "confidence": {
+      "type": "object",
+      "required": ["classification", "rationale"],
+      "properties": {
+        "classification": { "type": "string", "enum": ["high", "medium", "low"] },
+        "rationale": { "type": "string" }
+      }
+    },
+    "classification": {
+      "type": "object",
+      "required": ["recommended", "routing", "human_review_required"],
+      "properties": {
+        "recommended": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "non_qm",
+            "construction",
+            "investor_spec",
+            "dscr",
+            "reverse",
+            "commercial",
+            "complex",
+            "a_team_review",
+            "insufficient_info"
+          ]
+        },
+        "routing": {
+          "type": "string",
+          "enum": ["lo_standard", "senior_review", "ops_review"]
+        },
+        "human_review_required": { "type": "boolean" }
+      }
+    },
+    "borrower_objective": { "type": "string" },
+    "loan_purpose": { "type": "string" },
+    "occupancy_intent": { "type": "string" },
+    "borrower_profile": {
+      "type": "object",
+      "required": [
+        "employment_type",
+        "w2_or_self_employed",
+        "time_in_job_or_business",
+        "stated_credit_range",
+        "stated_income",
+        "assets_reserves",
+        "existing_debts",
+        "current_housing_payment",
+        "coborrower_guarantor"
+      ],
+      "properties": {
+        "employment_type": { "type": "string" },
+        "w2_or_self_employed": { "type": "string" },
+        "time_in_job_or_business": { "type": "string" },
+        "stated_credit_range": { "type": "string" },
+        "stated_income": { "type": "string" },
+        "assets_reserves": { "type": "string" },
+        "existing_debts": { "type": "string" },
+        "current_housing_payment": { "type": "string" },
+        "coborrower_guarantor": { "type": "string" }
+      }
+    },
+    "transaction": {
+      "type": "object",
+      "required": [
+        "purpose_detail",
+        "property_type",
+        "property_state",
+        "purchase_price_or_value",
+        "requested_loan_amount",
+        "down_payment_or_equity",
+        "land_or_construction_budget",
+        "exit_strategy",
+        "desired_timing"
+      ],
+      "properties": {
+        "purpose_detail": { "type": "string" },
+        "property_type": { "type": "string" },
+        "property_state": { "type": "string" },
+        "purchase_price_or_value": { "type": "string" },
+        "requested_loan_amount": { "type": "string" },
+        "down_payment_or_equity": { "type": "string" },
+        "land_or_construction_budget": { "type": "string" },
+        "exit_strategy": { "type": "string" },
+        "desired_timing": { "type": "string" }
+      }
+    },
+    "preliminary_calculations": {
+      "type": "object",
+      "required": ["ltv", "ltc", "dti_indicator", "liquidity"],
+      "properties": {
+        "ltv": {
+          "type": "object",
+          "required": ["value", "basis", "label"],
+          "properties": {
+            "value": { "type": "string" },
+            "basis": { "type": "string" },
+            "label": { "type": "string" }
+          }
+        },
+        "ltc": { "type": "string" },
+        "dti_indicator": { "type": "string" },
+        "liquidity": { "type": "string" }
+      }
+    },
+    "strengths": { "type": "array", "items": { "type": "string" } },
+    "risks_and_contradictions": { "type": "array", "items": { "type": "string" } },
+    "missing_information": { "type": "array", "items": { "type": "string" } },
+    "required_documents": { "type": "array", "items": { "type": "string" } },
+    "lender_direction": {
+      "type": "object",
+      "required": [
+        "likely_fits",
+        "possible_with_exception",
+        "clear_non_fits",
+        "additional_info_before_placement",
+        "note"
+      ],
+      "properties": {
+        "likely_fits": { "type": "array", "items": { "type": "string" } },
+        "possible_with_exception": { "type": "array", "items": { "type": "string" } },
+        "clear_non_fits": { "type": "array", "items": { "type": "string" } },
+        "additional_info_before_placement": { "type": "array", "items": { "type": "string" } },
+        "note": { "type": "string" }
+      }
+    },
+    "next_borrower_questions": { "type": "array", "items": { "type": "string" } },
+    "recommended_follow_up": { "type": "string" },
+    "provenance": {
+      "type": "object",
+      "required": ["borrower_stated", "document_verified", "system_calculated", "missing_or_unresolved"],
+      "properties": {
+        "borrower_stated": { "type": "array", "items": { "type": "string" } },
+        "document_verified": { "type": "array", "items": { "type": "string" } },
+        "system_calculated": { "type": "array", "items": { "type": "string" } },
+        "missing_or_unresolved": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Transcript Audit — SSN/DOB &amp; Spanish</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --surface2: #243044;
+      --text: #e7ecf3;
+      --muted: #9aa8bc;
+      --accent: #4f8cff;
+      --danger: #ff6b6b;
+      --warn: #ffb347;
+      --ok: #5bd69d;
+      --border: #2e3d54;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 2rem 1.25rem 4rem; }
+    h1 { font-size: 1.75rem; margin: 0 0 0.25rem; }
+    .subtitle { color: var(--muted); margin-bottom: 2rem; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+    }
+    .stat .num { font-size: 2rem; font-weight: 700; line-height: 1.1; }
+    .stat .label { color: var(--muted); font-size: 0.9rem; }
+    section { margin-bottom: 2.5rem; }
+    h2 {
+      font-size: 1.25rem;
+      margin: 0 0 0.35rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .section-desc { color: var(--muted); margin: 0 0 1rem; font-size: 0.95rem; }
+    .person-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+      margin-bottom: 1rem;
+    }
+    .person-card.priority { border-left: 4px solid var(--danger); }
+    .person-card.review { border-left: 4px solid var(--warn); }
+    .person-card header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 0.5rem 1rem;
+      align-items: baseline;
+      margin-bottom: 0.5rem;
+    }
+    .person-card h3 { margin: 0; font-size: 1.05rem; }
+    .meta { display: flex; flex-wrap: wrap; gap: 0.75rem; color: var(--muted); font-size: 0.88rem; }
+    .tags { margin-bottom: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      background: var(--surface2);
+      color: var(--text);
+    }
+    .badge.danger { background: rgba(255,107,107,0.18); color: #ffb4b4; }
+    .badge.warn { background: rgba(255,179,71,0.18); color: #ffd59a; }
+    .badge.info { background: rgba(79,140,255,0.18); color: #a8c7ff; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.55rem 0.65rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th { color: var(--muted); font-weight: 600; }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem;
+      word-break: break-all;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .table-wrap {
+      overflow-x: auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .table-wrap table { margin: 0; }
+    .table-wrap th:first-child, .table-wrap td:first-child { padding-left: 1rem; }
+    .table-wrap th:last-child, .table-wrap td:last-child { padding-right: 1rem; }
+    .note {
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 0.85rem 1rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 1rem;
+    }
+    @media print {
+      body { background: #fff; color: #111; }
+      .person-card, .stat, .table-wrap { border-color: #ccc; background: #fff; }
+      a { color: #036; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Transcript Audit Report</h1>
+    <p class="subtitle">Generated Friday, July 24, 2026 at 2:48 PM ET · 20 PII review rows · 8 Spanish mentions</p>
+
+    <div class="stats">
+      <div class="stat"><div class="num">8</div><div class="label">Actual SSN/DOB values</div></div>
+      <div class="stat"><div class="num">12</div><div class="label">Social/security cues only</div></div>
+      <div class="stat"><div class="num">20</div><div class="label">Total PII review</div></div>
+      <div class="stat"><div class="num">8</div><div class="label">Spanish in transcript</div></div>
+    </div>
+
+    <section>
+      <h2>🔴 Edit first — actual SSN or DOB in transcript</h2>
+      <p class="section-desc">8 borrower(s) with formatted SSN, DOB values, or digits captured after social/security cues.</p>
+      
+    <article class="person-card priority">
+      <header>
+        <h3>CARLEN HEYWARD</h3>
+        <div class="meta">
+          <span>(470) 429-4264</span>
+          <span>Shape 65394</span>
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge danger">DOB (date of birth value)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jul 6, 2026, 12:02 PM</td>
+        <td><code>7659446093632596424</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span> <span class="badge danger">DOB (date of birth value)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7659446093632596424" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card priority">
+      <header>
+        <h3>David Moss</h3>
+        <div class="meta">
+          <span>(770) 841-6202</span>
+          <span>Shape 76341</span>
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge danger">DOB (date of birth value)</span> <span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jul 23, 2026, 12:35 PM</td>
+        <td><code>06a6242e356d8077d21</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span> <span class="badge danger">DOB (date of birth value)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=06a6242e356d8077d21" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card priority">
+      <header>
+        <h3>DIANE CAMILLI</h3>
+        <div class="meta">
+          
+          
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge danger">DOB (date of birth value)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jun 19, 2026, 2:39 PM</td>
+        <td><code>7653178035540732866</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span> <span class="badge danger">DOB (date of birth value)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7653178035540732866" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card priority">
+      <header>
+        <h3>Keith Hopkinson</h3>
+        <div class="meta">
+          <span>(866) 260-1936</span>
+          <span>Shape 50328</span>
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge danger">DOB (date of birth value)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jun 16, 2026, 9:19 AM</td>
+        <td><code>7651982166321670785</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span> <span class="badge danger">DOB (date of birth value)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7651982166321670785" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card priority">
+      <header>
+        <h3>Leigh Ann Inman</h3>
+        <div class="meta">
+          
+          
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge danger">SSN (after &quot;social&quot; cue)</span> <span class="badge danger">SSN (after social security/SSN mention)</span> <span class="badge danger">SSN (formatted)</span> <span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jul 23, 2026, 2:51 PM</td>
+        <td><code>7665797989485099110</code></td>
+        <td><span class="badge danger">SSN (formatted)</span> <span class="badge danger">SSN (after &quot;social&quot; cue)</span> <span class="badge danger">SSN (after social security/SSN mention)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7665797989485099110" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card priority">
+      <header>
+        <h3>RABAB HUSSAIN</h3>
+        <div class="meta">
+          
+          
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge danger">DOB (date of birth value)</span> <span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jul 6, 2026, 4:02 PM</td>
+        <td><code>7659507769361944264</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span> <span class="badge danger">DOB (date of birth value)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7659507769361944264" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card priority">
+      <header>
+        <h3>RACHEL NEVINS</h3>
+        <div class="meta">
+          
+          
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge danger">SSN (after &quot;security number&quot; cue)</span> <span class="badge danger">SSN (after &quot;social&quot; cue)</span> <span class="badge danger">SSN (after social security/SSN mention)</span> <span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jul 2, 2026, 4:01 PM</td>
+        <td><code>7658023243980857010</code></td>
+        <td><span class="badge danger">SSN (after &quot;social&quot; cue)</span> <span class="badge danger">SSN (after &quot;security number&quot; cue)</span> <span class="badge danger">SSN (after social security/SSN mention)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7658023243980857010" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card priority">
+      <header>
+        <h3>Tony Pirtle</h3>
+        <div class="meta">
+          
+          
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge danger">DOB (date of birth value)</span> <span class="badge danger">SSN (after &quot;social&quot; cue)</span> <span class="badge danger">SSN (after social security/SSN mention)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jun 19, 2026, 9:15 AM</td>
+        <td><code>7653094382461500745</code></td>
+        <td><span class="badge danger">SSN (after &quot;social&quot; cue)</span> <span class="badge danger">SSN (after social security/SSN mention)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span> <span class="badge danger">DOB (date of birth value)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7653094382461500745" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    </section>
+
+    <section>
+      <h2>🟡 Review — "social" or "security number" mentioned</h2>
+      <p class="section-desc">12 borrower(s) where the transcript mentions social/security intake — check for spoken digits or remove sensitive content.</p>
+      
+    <article class="person-card review">
+      <header>
+        <h3>Aiken Zandria</h3>
+        <div class="meta">
+          <span>(470) 642-6210</span>
+          <span>Shape 27744</span>
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jul 22, 2026, 1:53 PM</td>
+        <td><code>7665411910579933394</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7665411910579933394" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card review">
+      <header>
+        <h3>CHUKWUEMEKA EBUBE</h3>
+        <div class="meta">
+          
+          
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jul 23, 2026, 2:11 PM</td>
+        <td><code>7665787660088737535</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7665787660088737535" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card review">
+      <header>
+        <h3>FRANCISCO PEREYRA</h3>
+        <div class="meta">
+          
+          
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jul 16, 2026, 12:30 PM</td>
+        <td><code>7663164143741533496</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7663164143741533496" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card review">
+      <header>
+        <h3>JEFFERY COOTE</h3>
+        <div class="meta">
+          
+          
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jul 2, 2026, 5:02 PM</td>
+        <td><code>7658038796057436103</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7658038796057436103" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card review">
+      <header>
+        <h3>JESSE LOPEZ</h3>
+        <div class="meta">
+          
+          
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jul 14, 2026, 4:21 PM</td>
+        <td><code>7662481480163506249</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7662481480163506249" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card review">
+      <header>
+        <h3>MARY GORDON</h3>
+        <div class="meta">
+          
+          
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jul 6, 2026, 11:07 AM</td>
+        <td><code>7659431890175668163</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7659431890175668163" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card review">
+      <header>
+        <h3>QuestMail Caller</h3>
+        <div class="meta">
+          
+          
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jun 22, 2026, 1:02 PM</td>
+        <td><code>7654266225634697453</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7654266225634697453" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card review">
+      <header>
+        <h3>RONALD DUTTON</h3>
+        <div class="meta">
+          
+          
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jul 23, 2026, 3:36 PM</td>
+        <td><code>7665809538652129139</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7665809538652129139" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card review">
+      <header>
+        <h3>Salvador Degante</h3>
+        <div class="meta">
+          
+          
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jul 13, 2026, 11:49 AM</td>
+        <td><code>7662040249583408226</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7662040249583408226" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card review">
+      <header>
+        <h3>Sandra Reyes</h3>
+        <div class="meta">
+          
+          
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jul 22, 2026, 1:16 PM</td>
+        <td><code>7665402504601475241</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7665402504601475241" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card review">
+      <header>
+        <h3>Steve Metz</h3>
+        <div class="meta">
+          <span>(253) 466-6598</span>
+          <span>Shape undefined</span>
+          
+        </div>
+      </header>
+      <div class="tags"><span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jun 4, 2026, 1:40 PM</td>
+        <td><code>06a21b88c56d80f16a9</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=06a21b88c56d80f16a9" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    <article class="person-card review">
+      <header>
+        <h3>Thierry Cabamba</h3>
+        <div class="meta">
+          <span>(682) 521-3916</span>
+          <span>Shape 59460</span>
+          <span>Ref 626C00904</span>
+        </div>
+      </header>
+      <div class="tags"><span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span></div>
+      <table>
+        <thead><tr><th>Call date</th><th>Call ID</th><th>Issues</th><th></th></tr></thead>
+        <tbody>
+      <tr>
+        <td>Jul 3, 2026, 2:35 PM</td>
+        <td><code>7658372227253546444</code></td>
+        <td><span class="badge warn">SSN cue (&quot;social&quot; — review manually)</span> <span class="badge warn">SSN cue (&quot;security number&quot; — review manually)</span></td>
+        <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7658372227253546444" target="_blank" rel="noopener">Open in Call Tracker</a></td>
+      </tr></tbody>
+      </table>
+    </article>
+    </section>
+
+    <section>
+      <h2>🗣️ Spanish mentioned anywhere in transcript</h2>
+      <p class="section-desc">8 call(s) where the word "spanish", "español", or "espanol" appears in the transcript text.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Borrower</th>
+              <th>Phone</th>
+              <th>Shape ID</th>
+              <th>Ref code</th>
+              <th>Call date</th>
+              <th>Call ID</th>
+              <th>Status</th>
+              <th>Source</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+    <tr>
+      <td><strong>Carlos Cruz</strong></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>Jul 17, 2026, 4:27 PM</td>
+      <td><code>7663596054242749860</code></td>
+      <td>Not Contacted</td>
+      <td>QuestMail</td>
+      <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7663596054242749860" target="_blank" rel="noopener">Open</a></td>
+    </tr>
+    <tr>
+      <td><strong>CARMEN JIMENEZ</strong></td>
+      <td>(704) 747-6023</td>
+      <td>58302</td>
+      <td>624QF00483</td>
+      <td>Jun 17, 2026, 3:40 PM</td>
+      <td><code>7652451507461830788</code></td>
+      <td>Not Contacted</td>
+      <td>Zoom Phone</td>
+      <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7652451507461830788" target="_blank" rel="noopener">Open</a></td>
+    </tr>
+    <tr>
+      <td><strong>QuestMail Caller</strong></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>Jul 23, 2026, 4:03 PM</td>
+      <td><code>7665816384830912461</code></td>
+      <td>Not Contacted</td>
+      <td>QuestMail</td>
+      <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7665816384830912461" target="_blank" rel="noopener">Open</a></td>
+    </tr>
+    <tr>
+      <td><strong>ROMAN ANGELES</strong></td>
+      <td>—</td>
+      <td>—</td>
+      <td>—</td>
+      <td>Jul 23, 2026, 1:11 PM</td>
+      <td><code>7665772288400777225</code></td>
+      <td>Advanced</td>
+      <td>QuestMail</td>
+      <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7665772288400777225" target="_blank" rel="noopener">Open</a></td>
+    </tr>
+    <tr>
+      <td><strong>Steve Metz</strong></td>
+      <td>(253) 466-6598</td>
+      <td>undefined</td>
+      <td>—</td>
+      <td>Jun 10, 2026, 12:30 PM</td>
+      <td><code>06a29910f56d806f0d4</code></td>
+      <td>Advanced</td>
+      <td>Zoom Phone</td>
+      <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=06a29910f56d806f0d4" target="_blank" rel="noopener">Open</a></td>
+    </tr>
+    <tr>
+      <td><strong>Steve Metz</strong></td>
+      <td>(253) 466-6598</td>
+      <td>undefined</td>
+      <td>—</td>
+      <td>Jun 10, 2026, 12:27 PM</td>
+      <td><code>06a29905256d806e958</code></td>
+      <td>Bad Lead</td>
+      <td>Zoom Phone</td>
+      <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=06a29905256d806e958" target="_blank" rel="noopener">Open</a></td>
+    </tr>
+    <tr>
+      <td><strong>Steve Metz</strong></td>
+      <td>(253) 466-6598</td>
+      <td>undefined</td>
+      <td>—</td>
+      <td>Jun 4, 2026, 1:40 PM</td>
+      <td><code>06a21b88c56d80f16a9</code></td>
+      <td>Did Not Advance</td>
+      <td>Zoom Phone</td>
+      <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=06a21b88c56d80f16a9" target="_blank" rel="noopener">Open</a></td>
+    </tr>
+    <tr>
+      <td><strong>Wireless Caller</strong></td>
+      <td>(866) 260-8397</td>
+      <td>50334</td>
+      <td>—</td>
+      <td>Jun 18, 2026, 6:24 PM</td>
+      <td><code>7652864928128838754</code></td>
+      <td>Not Contacted</td>
+      <td>Zoom Phone</td>
+      <td><a href="https://questrock-inbound-api.vercel.app/call-tracker/?q=7652864928128838754" target="_blank" rel="noopener">Open</a></td>
+    </tr></tbody>
+        </table>
+      </div>
+      <p class="note">No actual SSN/DOB values are shown in this report. Use Call Tracker links to open each call and edit the transcript. After deploy, new transcripts auto-redact on save; existing rows still need manual cleanup or a backfill.</p>
+    </section>
+  </div>
+</body>
+</html>
