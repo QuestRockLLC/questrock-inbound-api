@@ -53,11 +53,35 @@
         font-size: 0.9rem;
       }
       nav a:hover { color: var(--ink); }
-      .toolbar, .state-bar {
+      .toolbar, .state-bar, .search-bar {
         display: flex;
         gap: 0.5rem;
         flex-wrap: wrap;
         margin-bottom: 0.75rem;
+      }
+      .search-bar {
+        margin-bottom: 0.5rem;
+      }
+      .search-bar input {
+        flex: 1 1 14rem;
+        min-width: 12rem;
+        background: #0f172a;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        color: var(--ink);
+        padding: 0.5rem 0.9rem;
+        font: inherit;
+      }
+      .search-bar input:focus {
+        outline: none;
+        border-color: rgba(56, 189, 248, 0.55);
+      }
+      .search-bar label {
+        color: var(--muted);
+        font-size: 0.82rem;
+        font-weight: 600;
+        white-space: nowrap;
+        align-self: center;
       }
       .state-bar label {
         width: 100%;
@@ -734,6 +758,18 @@
         </div>
       </header>
 
+      <div class="search-bar">
+        <label for="global-search">Search</label>
+        <input
+          type="search"
+          id="global-search"
+          placeholder="Phone, name, or mailer code…"
+          autocomplete="off"
+        />
+        <button type="button" id="search-btn">Search</button>
+        <button type="button" id="search-clear" class="filter" hidden>Clear</button>
+      </div>
+
       <div class="toolbar">
         <button type="button" class="filter active" data-channel="">All calls</button>
         <button type="button" class="filter" data-channel="questmail">QuestMail</button>
@@ -802,6 +838,7 @@
       let channel = '';
       let state = '';
       let hours = 24;
+      let searchQuery = '';
       let openCallId = null;
       let showArchived = false;
       let archivedOnly = false;
@@ -1990,7 +2027,12 @@
       }
 
       async function load() {
-        const params = new URLSearchParams({ hours: String(hours), limit: '100' });
+        const params = new URLSearchParams({ limit: '100' });
+        if (searchQuery) {
+          params.set('q', searchQuery);
+        } else {
+          params.set('hours', String(hours));
+        }
         if (channel) params.set('channel', channel);
         if (state) params.set('state', state);
         if (archivedOnly) params.set('archived_only', '1');
@@ -2002,10 +2044,13 @@
           : showArchived
             ? ' · including archived'
             : '';
+        const searchHint = data.search_query ? ` · search “${data.search_query}”` : '';
+        const windowHint = data.search_query ? '' : ` · last ${data.view_label || hoursLabel(hours)}`;
         document.getElementById('meta').textContent =
-          `${data.count} call(s) · last ${data.view_label || hoursLabel(hours)}${state ? ` · ${state} landing` : ''}${archiveHint} · updated ${fmtTime(data.generated_at)} ET`;
+          `${data.count} call(s)${windowHint}${searchHint}${state ? ` · ${state} landing` : ''}${archiveHint} · updated ${fmtTime(data.generated_at)} ET`;
+        document.getElementById('search-clear').hidden = !searchQuery;
         if (!data.calls?.length) {
-          list.innerHTML = `<p class="empty">${archivedOnly ? 'No archived calls in this window.' : 'No calls in this window yet.'}</p>`;
+          list.innerHTML = `<p class="empty">${searchQuery ? 'No calls match your search.' : archivedOnly ? 'No archived calls in this window.' : 'No calls in this window yet.'}</p>`;
           return;
         }
         list.innerHTML = data.calls.map(renderCall).join('');
@@ -2051,6 +2096,31 @@
       });
 
       document.getElementById('refresh').addEventListener('click', () => load().catch((e) => alert(e.message)));
+
+      function runSearch() {
+        const input = document.getElementById('global-search');
+        const q = input?.value?.trim() ?? '';
+        if (q.length > 0 && q.length < 2) {
+          alert('Enter at least 2 characters to search.');
+          return;
+        }
+        searchQuery = q;
+        load().catch((e) => alert(e.message));
+      }
+
+      document.getElementById('search-btn').addEventListener('click', runSearch);
+      document.getElementById('global-search').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          runSearch();
+        }
+      });
+      document.getElementById('search-clear').addEventListener('click', () => {
+        searchQuery = '';
+        const input = document.getElementById('global-search');
+        if (input) input.value = '';
+        load().catch((e) => alert(e.message));
+      });
 
       document.getElementById('create-call-submit').addEventListener('click', async () => {
         const msg = document.getElementById('create-call-msg');
