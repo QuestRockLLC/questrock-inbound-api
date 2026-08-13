@@ -31,6 +31,9 @@
     "api/call-answered.js": {
       "maxDuration": 60
     },
+    "api/call-missed.js": {
+      "maxDuration": 60
+    },
     "api/call-tracker-weekly-report.js": {
       "maxDuration": 60
     },

@@ -734,6 +734,11 @@
         background: rgba(100, 116, 139, 0.35);
         color: #cbd5e1;
       }
+      .badge.missed {
+        background: rgba(248, 113, 113, 0.2);
+        color: #fecaca;
+        border: 1px solid rgba(248, 113, 113, 0.45);
+      }
       .manage-msg { font-size: 0.8rem; color: var(--muted); margin-left: 0.35rem; }
       .manage-msg.ok { color: #86efac; }
       .manage-msg.err { color: #fca5a5; }
@@ -775,6 +780,9 @@
         <button type="button" class="filter" data-channel="questmail">QuestMail</button>
         <button type="button" class="filter" data-channel="inbound_zoom">Inbound ads</button>
         <button type="button" class="filter" data-channel="shape_inbound">Shape leads</button>
+        <button type="button" class="filter active" data-outcome="">All outcomes</button>
+        <button type="button" class="filter" data-outcome="answered">Answered</button>
+        <button type="button" class="filter" data-outcome="missed">Missed</button>
         <button type="button" class="filter active" data-hours="24">Today</button>
         <button type="button" class="filter" data-hours="168">Week</button>
         <button type="button" class="filter" data-hours="720">Month</button>
@@ -837,6 +845,7 @@
     <script>
       let channel = '';
       let state = '';
+      let outcome = '';
       let hours = 24;
       let searchQuery = '';
       let openCallId = null;
@@ -1356,7 +1365,9 @@
           : c.pending_disposition
             ? `<span class="badge pending">Disposition email pending</span>`
             : `<span class="badge pending">${
-              c.transcript_state === 'needs_ai'
+              c.transcript_state === 'missed'
+                ? `Missed call${c.miss_reason ? ` · ${esc(String(c.miss_reason).replace(/_/g, ' '))}` : ''}`
+                : c.transcript_state === 'needs_ai'
                 ? 'Transcript ready — run QuestRock AI'
                 : c.transcript_state === 'awaiting_identification'
                   ? 'QuestMail — awaiting ID'
@@ -1376,6 +1387,7 @@
         const landingBadge = c.landing_page_label
           ? `<span class="badge landing">${esc(c.landing_page_label)}</span>`
           : '';
+        const missedBadge = c.is_missed_call ? `<span class="badge missed">Missed</span>` : '';
 
         const utm = c.utm_campaign ? ` · UTM ${esc(c.utm_campaign)}` : '';
         const dialed = c.dialed_number_display ? ` · Dialed ${esc(c.dialed_number_display)}` : '';
@@ -1471,6 +1483,8 @@
           : '';
         const transcript = c.transcript_text
           ? `<section class="copy-section"><div class="section-head"><h3>Transcript</h3>${copyBtn('Copy')}</div>${transcriptAdminNote}${analyzeBlock}<pre class="copy-block transcript-block">${esc(c.transcript_text)}</pre></section>`
+          : c.transcript_state === 'missed'
+            ? `<section><h3>Transcript</h3><p class="details">Missed call — no recording unless caller left voicemail (voicemail may arrive separately).</p></section>`
           : c.transcript_state === 'awaiting_call'
             ? `<section><h3>Transcript</h3><p class="details">Lead arrived from Shape — paste the call transcript once the borrower calls in.</p>${pastePanel}</section>`
           : c.transcript_state !== 'pending'
@@ -1484,6 +1498,7 @@
             <div>
               <span class="badge ${badgeClass(c)}">${esc(c.channel_label)}</span>
               ${landingBadge}
+              ${missedBadge}
               ${c.is_archived ? '<span class="badge archived-badge">Archived</span>' : ''}
               ${statusBadge}
               ${loDispositionBadge}
@@ -2035,6 +2050,7 @@
         }
         if (channel) params.set('channel', channel);
         if (state) params.set('state', state);
+        if (outcome) params.set('outcome', outcome);
         if (archivedOnly) params.set('archived_only', '1');
         else if (showArchived) params.set('include_archived', '1');
         const data = await InboundAuth.apiGet(`/api/call-tracker?${params}`);
@@ -2073,6 +2089,15 @@
           document.querySelectorAll('.filter[data-channel]').forEach((b) => b.classList.remove('active'));
           btn.classList.add('active');
           channel = btn.dataset.channel || '';
+          load().catch((e) => alert(e.message));
+        });
+      });
+
+      document.querySelectorAll('.filter[data-outcome]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter[data-outcome]').forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
+          outcome = btn.dataset.outcome || '';
           load().catch((e) => alert(e.message));
         });
       });

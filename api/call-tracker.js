@@ -16,6 +16,8 @@ export default async function handler(req, res) {
     const hours = Number(req.query?.hours ?? 24);
     const limit = Number(req.query?.limit ?? 80);
     const searchQuery = String(req.query?.q ?? '').trim();
+    const outcomeParam = String(req.query?.outcome ?? '').trim().toLowerCase();
+    const outcome = ['answered', 'missed'].includes(outcomeParam) ? outcomeParam : null;
 
     const allowedChannels = new Set(['questmail', 'inbound_zoom', 'shape_inbound']);
     const channelParam = String(req.query?.channel ?? '').trim().toLowerCase() || null;
@@ -26,6 +28,7 @@ export default async function handler(req, res) {
       limit: Number.isFinite(limit) ? limit : 80,
       includeArchived: req.query?.include_archived === '1',
       archivedOnly: req.query?.archived_only === '1',
+      outcome,
       viewerEmail: session.email,
     };
 
